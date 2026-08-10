@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  backend:
+    image: nkrifat47/ai-driven-voice-ordering-and-calling-platform:1.0
+    container_name: voice-ai-backend
+    ports:
+      - "5000:5000"
+      - "5555:5555"
+    env_file:
+      - .env.docker
+    depends_on:
+      - postgres
+      - redis
+    restart: always
+
+  postgres:
+    image: postgres:15
+    container_name: voice-ai-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: voice_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: voice-ai-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:

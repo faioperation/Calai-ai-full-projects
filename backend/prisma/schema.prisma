@@ -1,0 +1,433 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String            @id @default(uuid()) @db.Uuid
+  firstName        String
+  lastName         String
+  email            String            @unique
+  password         String
+  avatar           String?
+  gender           String?
+  country          String?
+  phone            String?
+  credits          Int               @default(0)
+  isVerified       Boolean           @default(false)
+  role             UserRole          @default(BUSINESS_OWNER)
+  status           UserStatus        @default(active)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  apiKeys          ApiKey[]
+  ownedBusinesses  Business[]
+  calls            Call[]
+  trainingSessions TrainingSession[]
+  userBusinesses   UserBusiness[]
+  auditLogs        AuditLog[]
+
+  @@map("users")
+}
+
+model Business {
+  id               String            @id @default(uuid()) @db.Uuid
+  ownerId          String            @db.Uuid
+  name             String
+  createdAt        DateTime          @default(now())
+  status           TenantStatus
+  businessType     BusinessType?
+  agents           Agent[]
+  apiKeys          ApiKey[]
+  owner            User              @relation(fields: [ownerId], references: [id])
+  businessSettings BusinessSetting?
+  calls            Call[]
+  integrations     Integration?
+  invoices         Invoice[]
+  items            Item[]
+  orders           Order[]
+  subscriptions    Subscription[]
+  trainingSessions TrainingSession[]
+  usageLogs        UsageLog[]
+  userBusinesses   UserBusiness[]
+  printers         Printer[]
+
+  @@map("business")
+}
+
+model UserBusiness {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @db.Uuid
+  userId     String   @db.Uuid
+  role       String
+  createdAt  DateTime @default(now())
+  business   Business @relation(fields: [businessId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@map("user_business")
+}
+
+model Plan {
+  id                    String         @id @default(uuid()) @db.Uuid
+  name                  String         @unique
+  callMinutesLimit      Int            @default(0)
+  aiMinutesLimit        Int            @default(0) @map("ai_minutes_limit")
+  forwardedMinutesLimit Int            @default(0) @map("forwarded_minutes_limit")
+  agentLimit            Int            @default(1) @map("agent_limit")
+  onboardingFee         Float          @default(0) @map("onboarding_fee")
+  callCountLimit        Int            @default(0)
+  messageLimit          Int            @default(0)
+  priceMonthly          Float
+  priceYearly           Float
+  stripeMonthlyPriceId  String?
+  stripeYearlyPriceId   String?
+  features              String[]
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  subscriptions         Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id         String             @id @default(uuid()) @db.Uuid
+  businessId String             @db.Uuid
+  planId     String             @db.Uuid
+  status     SubscriptionStatus
+  startDate  DateTime
+  endDate    DateTime
+  createdAt  DateTime           @default(now())
+  invoices   Invoice[]
+  business   Business           @relation(fields: [businessId], references: [id])
+  plan       Plan               @relation(fields: [planId], references: [id])
+
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id             String        @id @default(uuid()) @db.Uuid
+  invoiceNo      String
+  status         BillingStatus
+  billingCycle   BillingCycle
+  amount         Float
+  currency       String        @default("USD")
+  subscriptionId String        @db.Uuid
+  businessId     String        @db.Uuid
+  createdAt      DateTime      @default(now())
+  business       Business      @relation(fields: [businessId], references: [id])
+  subscription   Subscription  @relation(fields: [subscriptionId], references: [id])
+
+  @@map("invoices")
+}
+
+model ApiKey {
+  id         String     @id @default(uuid()) @db.Uuid
+  apiKey     String
+  status     UserStatus
+  businessId String     @db.Uuid
+  userId     String     @db.Uuid
+  createdAt  DateTime   @default(now())
+  lastUsed   DateTime?
+  business   Business   @relation(fields: [businessId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@map("api_keys")
+}
+
+model TrainingSession {
+  id            String         @id @default(uuid()) @db.Uuid
+  businessId    String         @db.Uuid
+  agentId       String?        @db.Uuid
+  type          TrainingType
+  status        TrainingStatus
+  createdAt     DateTime       @default(now())
+  createdBy     String         @db.Uuid
+  trainingFiles TrainingFile[]
+  business      Business       @relation(fields: [businessId], references: [id])
+  creator       User           @relation(fields: [createdBy], references: [id])
+  agent         Agent?         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("training_sessions")
+}
+
+model TrainingFile {
+  id        String          @id @default(uuid()) @db.Uuid
+  sessionId String          @db.Uuid
+  fileName  String
+  fileType  String
+  fileUrl   String
+  createdAt DateTime        @default(now())
+  session   TrainingSession @relation(fields: [sessionId], references: [id])
+
+  @@map("training_files")
+}
+
+model Call {
+  id             String       @id @default(uuid()) @db.Uuid
+  businessId     String       @db.Uuid
+  userId         String       @db.Uuid
+  customerNumber String?
+  duration       Int
+  createdAt      DateTime     @default(now())
+  endTime        DateTime
+  startTime      DateTime
+  type           CallType     @default(ai_call)
+  status         CallStatus
+  vapiCallId     String?      @unique
+  vapiAgentId    String?
+  callSummary    CallSummary?
+  business       Business     @relation(fields: [businessId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+  orders         Order?
+
+  @@map("calls")
+}
+
+model CallSummary {
+  id         String   @id @default(uuid()) @db.Uuid
+  callId     String   @unique @db.Uuid
+  createdAt  DateTime @default(now())
+  summary    String?
+  pdfUrl     String?
+  transcript String?
+  call       Call     @relation(fields: [callId], references: [id])
+
+  @@map("call_summaries")
+}
+
+model Item {
+  id          String      @id @default(uuid()) @db.Uuid
+  businessId  String      @db.Uuid
+  category    String
+  name        String
+  unit        String
+  price       Float
+  vapiAgentId String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  business    Business    @relation(fields: [businessId], references: [id])
+  orderItems  OrderItem[]
+
+  @@map("items")
+}
+
+model Order {
+  id            String      @id @default(uuid()) @db.Uuid
+  businessId    String      @db.Uuid
+  callId        String      @unique @db.Uuid
+  customerName  String?
+  customerEmail String?
+  totalPrice    Float?
+  items         Json?
+  orderType     OrderType   @default(PICKUP)
+  deliveryAddress String?
+  pickupTime      String?
+  createdAt     DateTime    @default(now())
+  orderItems    OrderItem[]
+  business      Business    @relation(fields: [businessId], references: [id])
+  call          Call        @relation(fields: [callId], references: [id])
+  printJobs     PrintJob[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  orderId   String   @db.Uuid
+  itemId    String   @db.Uuid
+  quantity  Int
+  unitPrice Float
+  subtotal  Float
+  createdAt DateTime @default(now())
+  item      Item     @relation(fields: [itemId], references: [id])
+  order     Order    @relation(fields: [orderId], references: [id])
+
+  @@map("order_items")
+}
+
+model UsageLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  businessId    String   @db.Uuid
+  date          DateTime
+  totalCalls    Int
+  dropRate      Float
+  totalDuration Int
+  totalMessages Int
+  business      Business @relation(fields: [businessId], references: [id])
+
+  @@map("usage_logs")
+}
+
+model BusinessSetting {
+  id              String   @id @default(uuid()) @db.Uuid
+  businessId      String   @unique @db.Uuid
+  businessName    String
+  businessAddress String
+  openingTime     String?
+  closingTime     String?
+  offDays         String[] @default([])
+  business        Business @relation(fields: [businessId], references: [id])
+
+  @@map("business_settings")
+}
+
+model Integration {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @unique @db.Uuid
+  email      String
+  phone      String
+  business   Business @relation(fields: [businessId], references: [id])
+
+  @@map("integrations")
+}
+
+model PlatformSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  logoUrl   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_settings")
+}
+
+model Agent {
+  id               String            @id @default(uuid()) @db.Uuid
+  businessId       String            @db.Uuid
+  twilioNumber     String
+  managerNumber    String
+  script           String
+  status           AgentStatus       @default(active)
+  vapiAgentId      String?           @unique
+  name             String?
+  vapiPhoneNumberId String?
+  business         Business          @relation(fields: [businessId], references: [id])
+  trainingSessions TrainingSession[]
+
+  @@map("agent")
+}
+
+enum UserStatus {
+  active
+  inactive
+}
+
+enum UserRole {
+  SYSTEM_OWNER
+  BUSINESS_OWNER
+}
+
+enum TenantStatus {
+  active
+  suspended
+  trial
+  expired
+}
+
+enum SubscriptionStatus {
+  active
+  expired
+  canceled
+}
+
+enum TrainingType {
+  text
+  voice
+  faq
+}
+
+enum TrainingStatus {
+  processing
+  completed
+  failed
+}
+
+enum CallType {
+  ai_call
+  text_call
+}
+
+enum CallStatus {
+  completed
+  failed
+}
+
+enum SenderType {
+  ai
+  user
+}
+
+enum BillingStatus {
+  paid
+  unpaid
+}
+
+enum BillingCycle {
+  monthly
+  yearly
+}
+
+enum AgentStatus {
+  active
+  inactive
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @db.Uuid
+  userEmail  String?
+  action     String
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
+
+enum BusinessType {
+  restaurent
+  take_way
+}
+
+enum OrderType {
+  PICKUP
+  DELIVERY
+}
+
+model Printer {
+  id           String     @id @default(uuid()) @db.Uuid
+  businessId   String     @db.Uuid @map("business_id")
+  deviceName   String     @map("device_name")
+  serialNumber String     @map("serial_number")
+  ipAddress    String?    @map("ip_address")
+  status       String     @default("offline") // "online", "offline"
+  lastSeen     DateTime   @default(now()) @updatedAt @map("last_seen")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  
+  business     Business   @relation(fields: [businessId], references: [id])
+  printJobs    PrintJob[]
+
+  @@unique([businessId, serialNumber])
+  @@map("printers")
+}
+
+model PrintJob {
+  id             String     @id @default(uuid()) @db.Uuid
+  printerId      String     @db.Uuid @map("printer_id")
+  orderId        String     @db.Uuid @map("order_id")
+  status         String     @default("pending") // "pending", "printing", "completed", "failed"
+  rawReceiptText String?    @map("raw_receipt_text")
+  retryCount     Int        @default(0) @map("retry_count")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  printer        Printer    @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  order          Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("print_jobs")
+}
