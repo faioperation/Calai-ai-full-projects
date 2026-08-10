@@ -1,0 +1,16 @@
+.env
+**/__pycache__/
+*.pyc
+venv/
+call_logs/
+.env.example
+uploads/
+reports/
+business_configs.json
+business_configs.json
+data/business_configs.json
+data/business_configs
+data/*.json
+BACKEND_HANDOVER.md
+implementation_plan.md
+AI_DOCUMENTATION.md 
