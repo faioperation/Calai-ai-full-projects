@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+
+
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+button{
+  cursor: pointer;
+}
+
+body{
+  font-family: 'Inter', sans-serif;
+}
