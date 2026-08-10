@@ -8,7 +8,7 @@ RUN npm ci --prefer-offline --no-audit
 COPY . .
 
 # Generate Prisma Client
-RUN npx prisma generate
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
 
 FROM node:20-alpine AS runner
 
