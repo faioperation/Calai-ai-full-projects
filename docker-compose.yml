@@ -1,0 +1,116 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: calai-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-calai_voice_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - calai-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-calai_voice_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: calai-redis
+    restart: always
+    networks:
+      - calai-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: calai-backend
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-calai_voice_db}?schema=public
+      - REDIS_URL=redis://redis:6379
+      - AI_SERVICE_URL=http://ai-service:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - calai-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  ai-service:
+    build:
+      context: ./ai-codebase
+      dockerfile: Dockerfile
+    container_name: calai-ai-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - EXTERNAL_BACKEND_URL=http://backend:8000/api/webhook/vapi
+    depends_on:
+      - backend
+    networks:
+      - calai-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://api.calai.info/api}
+    container_name: calai-frontend
+    restart: always
+    networks:
+      - calai-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: calai-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot_etc:/etc/letsencrypt
+      - certbot_var:/var/www/certbot
+    depends_on:
+      - frontend
+      - backend
+      - ai-service
+    networks:
+      - calai-network
+
+networks:
+  calai-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  certbot_etc:
+  certbot_var:

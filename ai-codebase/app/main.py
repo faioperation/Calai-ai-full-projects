@@ -166,6 +166,11 @@ def parse_and_format_order_details(order_items, total_price) -> list:
 
 app = FastAPI(title="Vapi AI Microservice")
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "service": "ai-service"}
+
+
 from app.agent_status import router as agent_status_router
 app.include_router(agent_status_router)
 

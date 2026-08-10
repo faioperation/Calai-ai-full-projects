@@ -1,7 +1,14 @@
 node_modules
 npm-debug.log
 .env
+.env.*
+!.env.example
 .git
 .gitignore
-
-/uploads
+.dockerignore
+Dockerfile
+docker-compose*.yml
+dist
+coverage
+uploads/*
+!uploads/.gitkeep
