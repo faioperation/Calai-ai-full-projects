@@ -40,91 +40,69 @@ const checkPlanLimits = async (businessId) => {
   const plan = activeSubscription.plan;
   const isFreeTrial = /free tra[il]/i.test(plan.name);
 
-  // 1. Check call minutes limit
-  let totalUsedSeconds = 0;
-  if (isFreeTrial) {
-    // For free trial, sum up all calls ever made by this business
-    const totalDurationResult = await prisma.call.aggregate({
-      where: { businessId },
-      _sum: { duration: true },
-    });
-    totalUsedSeconds = totalDurationResult._sum.duration || 0;
-  } else {
-    // For paid plans, sum up calls made within the current billing period
-    const totalDurationResult = await prisma.call.aggregate({
-      where: {
-        businessId,
-        startTime: {
-          gte: activeSubscription.startDate,
-          lte: activeSubscription.endDate,
-        },
-      },
-      _sum: { duration: true },
-    });
-    totalUsedSeconds = totalDurationResult._sum.duration || 0;
-  }
+  const dateFilter = isFreeTrial
+    ? undefined
+    : { gte: activeSubscription.startDate, lte: activeSubscription.endDate };
 
-  const totalUsedMinutes = totalUsedSeconds / 60;
-  const effectiveMinutesLimit = plan.aiMinutesLimit > 0 ? plan.aiMinutesLimit : plan.callMinutesLimit;
+  // Sum up AI calls vs Forwarded calls
+  const aiDurationResult = await prisma.call.aggregate({
+    where: {
+      businessId,
+      type: "ai_call",
+      startTime: dateFilter,
+    },
+    _sum: { duration: true },
+  });
 
-  if (effectiveMinutesLimit > 0 && totalUsedMinutes >= effectiveMinutesLimit) {
-    // Auto-expire the subscription
+  const forwardedDurationResult = await prisma.call.aggregate({
+    where: {
+      businessId,
+      type: "forwarded_call",
+      startTime: dateFilter,
+    },
+    _sum: { duration: true },
+  });
+
+  const aiUsedMinutes = (aiDurationResult._sum.duration || 0) / 60;
+  const forwardedUsedMinutes =
+    (forwardedDurationResult._sum.duration || 0) / 60;
+
+  const aiLimit =
+    plan.aiMinutesLimit > 0 ? plan.aiMinutesLimit : plan.callMinutesLimit;
+  const forwardedLimit = plan.forwardedMinutesLimit || 0;
+
+  if (aiLimit > 0 && aiUsedMinutes >= aiLimit) {
     await prisma.subscription.update({
       where: { id: activeSubscription.id },
       data: { status: "expired" },
     });
     return {
       isExceeded: true,
-      reason: `You have exceeded your AI minutes limit of ${effectiveMinutesLimit} minutes. Please upgrade your plan.`,
+      reason: `You have exceeded your AI minutes limit of ${aiLimit} minutes. Please upgrade your plan.`,
       remainingMinutes: 0,
-      remainingCalls: 0,
-    };
-  }
-
-  // 2. Check call count limit (e.g. max 130 calls for Starter)
-  if (plan.callCountLimit > 0) {
-    const totalCallsCount = await prisma.call.count({
-      where: {
-        businessId,
-        startTime: {
-          gte: activeSubscription.startDate,
-          lte: activeSubscription.endDate,
-        },
-      },
-    });
-
-    if (totalCallsCount >= plan.callCountLimit) {
-      // Auto-expire the subscription
-      await prisma.subscription.update({
-        where: { id: activeSubscription.id },
-        data: { status: "expired" },
-      });
-      return {
-        isExceeded: true,
-        reason: `You have exceeded your plan limit of ${plan.callCountLimit} calls. Please upgrade your plan.`,
-        remainingMinutes: Math.max(0, plan.callMinutesLimit - totalUsedMinutes),
-        remainingCalls: 0,
-      };
-    }
-
-    return {
-      isExceeded: false,
-      remainingMinutes: Math.max(0, plan.callMinutesLimit - totalUsedMinutes),
-      remainingCalls: Math.max(0, plan.callCountLimit - totalCallsCount),
-      subscription: activeSubscription,
+      remainingAiMinutes: 0,
+      remainingForwardedMinutes: Math.max(
+        0,
+        forwardedLimit - forwardedUsedMinutes,
+      ),
     };
   }
 
   return {
     isExceeded: false,
-    remainingMinutes: Math.max(0, plan.callMinutesLimit - totalUsedMinutes),
-    remainingCalls: null, // Unlimited calls
+    remainingMinutes: Math.max(0, aiLimit - aiUsedMinutes),
+    remainingAiMinutes: Math.max(0, aiLimit - aiUsedMinutes),
+    remainingForwardedMinutes: Math.max(
+      0,
+      forwardedLimit - forwardedUsedMinutes,
+    ),
+    aiUsedMinutes: Math.round(aiUsedMinutes * 100) / 100,
+    forwardedUsedMinutes: Math.round(forwardedUsedMinutes * 100) / 100,
     subscription: activeSubscription,
   };
 };
 
 const getMySubscriptionFromDB = async (userId) => {
-  // Find the business owned by this user
   const business = await prisma.business.findFirst({
     where: { ownerId: userId },
   });
@@ -133,10 +111,8 @@ const getMySubscriptionFromDB = async (userId) => {
     return null;
   }
 
-  // Run the limits check (which auto-expires the subscription if limits are hit or date expired)
   const limitCheck = await checkPlanLimits(business.id);
 
-  // Retrieve subscription (could have been expired by the check above)
   const subscription = await prisma.subscription.findFirst({
     where: {
       businessId: business.id,
@@ -148,21 +124,31 @@ const getMySubscriptionFromDB = async (userId) => {
   });
 
   if (!subscription) {
-    // If no active subscription, return the latest subscription (expired/canceled) so the frontend knows what expired
     const latestSubscription = await prisma.subscription.findFirst({
       where: { businessId: business.id },
       orderBy: { createdAt: "desc" },
       include: { plan: true },
     });
     return latestSubscription
-      ? { ...latestSubscription, remainingMinutes: 0, remainingCalls: 0 }
+      ? {
+          ...latestSubscription,
+          remainingMinutes: 0,
+          remainingAiMinutes: 0,
+          remainingForwardedMinutes: 0,
+          aiUsedMinutes: 0,
+          forwardedUsedMinutes: 0,
+        }
       : null;
   }
 
   return {
     ...subscription,
     remainingMinutes: Math.round(limitCheck.remainingMinutes * 100) / 100,
-    remainingCalls: limitCheck.remainingCalls,
+    remainingAiMinutes: Math.round(limitCheck.remainingAiMinutes * 100) / 100,
+    remainingForwardedMinutes:
+      Math.round(limitCheck.remainingForwardedMinutes * 100) / 100,
+    aiUsedMinutes: limitCheck.aiUsedMinutes,
+    forwardedUsedMinutes: limitCheck.forwardedUsedMinutes,
   };
 };
 

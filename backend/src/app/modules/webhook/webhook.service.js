@@ -134,7 +134,9 @@ const processVapiWebhook = async (payload) => {
       payload.assistant?.id;
 
     if (!assistantId) {
-      console.error("❌ Webhook Error: No assistantId found in assistant-request payload");
+      console.error(
+        "❌ Webhook Error: No assistantId found in assistant-request payload",
+      );
       return { success: false, message: "No assistantId provided" };
     }
 
@@ -153,19 +155,23 @@ const processVapiWebhook = async (payload) => {
     const limits = await SubscriptionService.checkPlanLimits(agent.businessId);
 
     if (limits.isExceeded) {
-      console.log(`🚫 Call Blocked: Business ${agent.businessId} has exceeded plan limits. Reason: ${limits.reason}`);
+      console.log(
+        `🚫 Call Blocked: Business ${agent.businessId} has exceeded plan limits. Reason: ${limits.reason}`,
+      );
       return {
         isAssistantRequestResponse: true,
         assistant: {
           name: "Limit Exceeded",
-          firstMessage: "Hello. This business has run out of calling minutes. Please upgrade your subscription to resume calls. Goodbye.",
+          firstMessage:
+            "Hello. This business has run out of calling minutes. Please upgrade your subscription to resume calls. Goodbye.",
           model: {
             provider: "openai",
             model: "gpt-4o-mini",
             messages: [
               {
                 role: "system",
-                content: "You are an automated message receptionist. You must politely inform the caller: 'This business has run out of calling minutes. Please upgrade your subscription to resume calls. Goodbye.' and then immediately hang up.",
+                content:
+                  "You are an automated message receptionist. You must politely inform the caller: 'This business has run out of calling minutes. Please upgrade your subscription to resume calls. Goodbye.' and then immediately hang up.",
               },
             ],
           },
@@ -287,7 +293,10 @@ const processVapiWebhook = async (payload) => {
       },
     });
 
-    const { orderType, deliveryAddress, pickupTime } = parseOrderTypeAndAddress(payload, call.startTime);
+    const { orderType, deliveryAddress, pickupTime } = parseOrderTypeAndAddress(
+      payload,
+      call.startTime,
+    );
 
     const orderRecord = await prisma.order.upsert({
       where: { callId: call.id },
@@ -454,8 +463,13 @@ const processVapiWebhook = async (payload) => {
         const customerEmail =
           args.customer_email || args.customerEmail || args.email || "N/A";
 
-        const { orderType, deliveryAddress: parsedAddress, pickupTime } = parseOrderTypeAndAddress(args, call?.startTime);
-        const deliveryAddress = parsedAddress || vapiCall?.customer?.address || null;
+        const {
+          orderType,
+          deliveryAddress: parsedAddress,
+          pickupTime,
+        } = parseOrderTypeAndAddress(args, call?.startTime);
+        const deliveryAddress =
+          parsedAddress || vapiCall?.customer?.address || null;
 
         if (call) {
           const orderRecord = await prisma.order.upsert({
@@ -484,7 +498,7 @@ const processVapiWebhook = async (payload) => {
           console.log(
             `✅ Order synced successfully in tool call! Total: £${totalPrice}`,
           );
-          
+
           await PrinterService.autoQueueOrderPrint(businessId, orderRecord.id);
           await notifyNewOrder(orderRecord.id);
         }
@@ -666,8 +680,13 @@ const processVapiWebhook = async (payload) => {
       structuredData.email ||
       "N/A";
 
-    const { orderType, deliveryAddress: parsedAddress, pickupTime } = parseOrderTypeAndAddress(structuredData, call.startTime);
-    const deliveryAddress = parsedAddress || vapiCall?.customer?.address || null;
+    const {
+      orderType,
+      deliveryAddress: parsedAddress,
+      pickupTime,
+    } = parseOrderTypeAndAddress(structuredData, call.startTime);
+    const deliveryAddress =
+      parsedAddress || vapiCall?.customer?.address || null;
 
     // Only create order if there are items or a price
     if (orderItems.length > 0 || totalPrice > 0) {

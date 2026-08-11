@@ -209,7 +209,7 @@ const Telephony = () => {
       width: "30%",
       sortable: true,
       render: (row) => {
-        const name = row.name || "N/A";
+        const name = row.agentName || "N/A";
         return (
           <div className="text-left text-gray-200 truncate pr-4" title={name}>
             {name}

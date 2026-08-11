@@ -19,7 +19,9 @@ export const initSocket = (server) => {
     socket.on("join-business-room", (businessId) => {
       if (businessId) {
         socket.join(`business_${businessId}`);
-        console.log(`🔌 Socket client ${socket.id} joined room: business_${businessId}`);
+        console.log(
+          `🔌 Socket client ${socket.id} joined room: business_${businessId}`,
+        );
       }
     });
 
@@ -62,10 +64,17 @@ export const notifyNewOrder = async (orderId) => {
     };
 
     if (io) {
-      io.to(`business_${order.businessId}`).emit("order:confirmed", formattedOrder);
-      console.log(`⚡ Order confirmed event emitted to room: business_${order.businessId}`);
+      io.to(`business_${order.businessId}`).emit(
+        "order:confirmed",
+        formattedOrder,
+      );
+      console.log(
+        `⚡ Order confirmed event emitted to room: business_${order.businessId}`,
+      );
     } else {
-      console.warn("⚠️ Socket.io is not initialized, could not emit order:confirmed event.");
+      console.warn(
+        "⚠️ Socket.io is not initialized, could not emit order:confirmed event.",
+      );
     }
   } catch (error) {
     console.error("❌ Error notifying new order via socket:", error);

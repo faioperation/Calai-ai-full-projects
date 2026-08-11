@@ -1,7 +1,9 @@
 import prisma from "../prisma/client.js";
 
 export const runDatabaseCleanup = async (retentionDays = 30) => {
-  console.log(`🧹 Database Cleanup Job Started (Retention: ${retentionDays} days)`);
+  console.log(
+    `🧹 Database Cleanup Job Started (Retention: ${retentionDays} days)`,
+  );
   try {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
@@ -39,8 +41,9 @@ export const runDatabaseCleanup = async (retentionDays = 30) => {
       return { deletedCallsCount: 0, deletedOrdersCount: 0 };
     }
 
-    console.log(`` + 
-      `🧹 Database Cleanup: Found ${callIds.length} calls and ${orderIds.length} orders older than ${retentionDays} days.`
+    console.log(
+      `` +
+        `🧹 Database Cleanup: Found ${callIds.length} calls and ${orderIds.length} orders older than ${retentionDays} days.`,
     );
 
     // Perform deletions in correct order in a transaction to prevent constraint violations
