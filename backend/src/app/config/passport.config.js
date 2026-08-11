@@ -47,44 +47,50 @@ passport.use(
   ),
 );
 
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: envVars.GOOGLE_CLIENT_ID,
-      clientSecret: envVars.GOOGLE_CLIENT_SECRET,
-      callbackURL: envVars.GOOGLE_CALLBACK_URL,
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        const email = profile.emails[0].value;
-        const nameParts = profile.displayName.split(" ");
-        const first_name = nameParts[0];
-        const last_name = nameParts.slice(1).join(" ") || "";
-        const avatarUrl = profile.photos[0]?.value;
+if (
+  envVars.GOOGLE_CLIENT_ID &&
+  envVars.GOOGLE_CLIENT_SECRET &&
+  envVars.GOOGLE_CALLBACK_URL
+) {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: envVars.GOOGLE_CLIENT_ID,
+        clientSecret: envVars.GOOGLE_CLIENT_SECRET,
+        callbackURL: envVars.GOOGLE_CALLBACK_URL,
+      },
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          const email = profile.emails[0].value;
+          const nameParts = profile.displayName.split(" ");
+          const first_name = nameParts[0];
+          const last_name = nameParts.slice(1).join(" ") || "";
+          const avatarUrl = profile.photos[0]?.value;
 
-        let user = await prisma.users.findUnique({
-          where: { email },
-        });
-
-        if (!user) {
-          user = await prisma.users.create({
-            data: {
-              email,
-              first_name,
-              last_name,
-              avatar: avatarUrl,
-              is_verified: true,
-            },
+          let user = await prisma.users.findUnique({
+            where: { email },
           });
-        }
 
-        return done(null, user);
-      } catch (err) {
-        return done(err);
-      }
-    },
-  ),
-);
+          if (!user) {
+            user = await prisma.users.create({
+              data: {
+                email,
+                first_name,
+                last_name,
+                avatar: avatarUrl,
+                is_verified: true,
+              },
+            });
+          }
+
+          return done(null, user);
+        } catch (err) {
+          return done(err);
+        }
+      },
+    ),
+  );
+}
 
 // Optional: Serialize/Deserialize if sessions are used (not strictly needed for JWT but good to have)
 passport.serializeUser((user, done) => {
