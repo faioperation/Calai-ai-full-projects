@@ -175,7 +175,29 @@ def create_assistant(business_id: str, system_prompt: str, business_name: str = 
         print(f"DEBUG VAPI ERROR: {error_msg}")
         raise Exception(f"Vapi Error: {error_msg} | Payload sent: {json.dumps(payload)}")
     
-    return response.json()
+    result = response.json()
+
+    # Sync the save_order tool's server URL to match VAPI_SERVER_URL.
+    # The dashboard-created tool has its own server.url which may point to
+    # an old ngrok URL. This ensures it always uses the production endpoint.
+    if vapi_server_url and VAPI_DEFAULT_TOOL_ID:
+        try:
+            tool_patch_url = f"{VAPI_BASE_URL}/tool/{VAPI_DEFAULT_TOOL_ID}"
+            tool_patch_payload = {
+                "server": {
+                    "url": vapi_server_url,
+                    "timeoutSeconds": 20
+                }
+            }
+            tool_patch_res = requests.patch(tool_patch_url, headers=HEADERS, json=tool_patch_payload)
+            if tool_patch_res.status_code < 400:
+                print(f"[SYNC] save_order tool server URL updated to: {vapi_server_url}")
+            else:
+                print(f"Warning: Failed to update save_order tool server URL: {tool_patch_res.text}")
+        except Exception as e:
+            print(f"Warning: Failed to sync save_order tool server URL: {e}")
+
+    return result
 
 
 def link_telephony(assistant_id: str, twilio_number: str, manager_number: str) -> dict:
