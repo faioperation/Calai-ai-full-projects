@@ -152,17 +152,7 @@ const ItemManagement = () => {
     <div>
       <Breadcrumb text="You can see your item management" />
 
-      <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-4 mb-6">
-        <div className="flex shrink-0">
-          <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="flex items-center gap-2 bg-linear-to-t from-[#00135B] via-[#02060F] to-[#00104E] text-white px-6 py-3 rounded-full text-sm font-semibold border border-[#1e3a8a] shadow-[0_0_20px_rgba(37,99,235,0.15)] hover:shadow-[0_0_25px_rgba(37,99,235,0.3)] transition-all cursor-pointer"
-          >
-            <UploadCloud className="w-5 h-5" />
-            Upload Menu
-          </button>
-        </div>
-      </div>
+      <div className="mb-6"></div>
 
       <div className="bg-[#191919] border border-[#1A1A1A] rounded-2xl overflow-visible shadow-sm relative z-0">
         {items.length > 0 ? (

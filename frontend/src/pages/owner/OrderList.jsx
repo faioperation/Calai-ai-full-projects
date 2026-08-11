@@ -110,7 +110,7 @@ const OrderList = () => {
   };
 
   const columns = [
-    { key: "callId", Title: "Caller ID", width: "25%" },
+    { key: "number", Title: "Number", width: "25%" },
     { key: "customerName", Title: "Customer Name", width: "20%" },
     { key: "time", Title: "Time", width: "15%" },
     { key: "date", Title: "Date", width: "15%" },
