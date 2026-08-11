@@ -19,9 +19,8 @@ const handleError = (res, error, context = "Business Hour Management") => {
 const getBusinessHour = async (req, res) => {
   try {
     const { businessId } = req.params;
-    const result = await BusinessHourService.getBusinessHourByBusinessId(
-      businessId,
-    );
+    const result =
+      await BusinessHourService.getBusinessHourByBusinessId(businessId);
 
     return res.status(StatusCodes.OK).json({
       success: true,

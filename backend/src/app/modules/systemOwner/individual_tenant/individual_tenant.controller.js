@@ -3,7 +3,6 @@ import { IndividualTenantService } from "./individual_tenant.service.js";
 import DevBuildError from "../../../lib/DevBuildError.js";
 import { PdfGenerator } from "../../../utils/pdfGenerator.js";
 
-
 const handleError = (res, error) => {
   console.error("Individual Tenant Controller Error:", error);
   if (error instanceof DevBuildError) {
@@ -21,7 +20,8 @@ const handleError = (res, error) => {
 const getTenantAgents = async (req, res) => {
   try {
     const businessId = req.params.id;
-    const result = await IndividualTenantService.getTenantAgentsFromDB(businessId);
+    const result =
+      await IndividualTenantService.getTenantAgentsFromDB(businessId);
     return res.status(StatusCodes.OK).json({
       success: true,
       message: "Tenant agents fetched successfully",
@@ -35,7 +35,8 @@ const getTenantAgents = async (req, res) => {
 const getTenantCalls = async (req, res) => {
   try {
     const businessId = req.params.id;
-    const result = await IndividualTenantService.getTenantCallsFromDB(businessId);
+    const result =
+      await IndividualTenantService.getTenantCallsFromDB(businessId);
     return res.status(StatusCodes.OK).json({
       success: true,
       message: "Tenant call history fetched successfully",
@@ -49,7 +50,8 @@ const getTenantCalls = async (req, res) => {
 const getTenantOrders = async (req, res) => {
   try {
     const businessId = req.params.id;
-    const result = await IndividualTenantService.getTenantOrdersFromDB(businessId);
+    const result =
+      await IndividualTenantService.getTenantOrdersFromDB(businessId);
     return res.status(StatusCodes.OK).json({
       success: true,
       message: "Tenant orders fetched successfully",
@@ -63,7 +65,8 @@ const getTenantOrders = async (req, res) => {
 const getTenantBillingHistory = async (req, res) => {
   try {
     const businessId = req.params.id;
-    const result = await IndividualTenantService.getTenantBillingHistoryFromDB(businessId);
+    const result =
+      await IndividualTenantService.getTenantBillingHistoryFromDB(businessId);
     return res.status(StatusCodes.OK).json({
       success: true,
       message: "Tenant billing history fetched successfully",
