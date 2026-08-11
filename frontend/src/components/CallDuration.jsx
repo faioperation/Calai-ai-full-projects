@@ -28,21 +28,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 const CallDuration = ({ data: apiData }) => {
   const [timeRange, setTimeRange] = useState('Last 15 days');
 
-  const defaultData = [
-    { name: '1 Feb', value: 34 },
-    { name: '2 Feb', value: 54 },
-    { name: '3 Feb', value: 35 },
-    { name: '4 Feb', value: 43 },
-    { name: '5 Feb', value: 52 },
-    { name: '6 Feb', value: 87 },
-    { name: '7 Feb', value: 41 },
-    { name: '8 Feb', value: 63 },
-    { name: '9 Feb', value: 41 },
-    { name: '10 Feb', value: 51 },
-    { name: '11 Feb', value: 52 },
-    { name: '12 Feb', value: 52 },
-    { name: '13 Feb', value: 77 },
-  ];
+
 
   const chartData = apiData && apiData.length > 0
     ? apiData.map(item => ({
@@ -65,16 +51,7 @@ const CallDuration = ({ data: apiData }) => {
           </div>
         </div>
         
-        <div className="w-44">
-          <Dropdown
-            options={["Last 7 days", "Last 15 days", "Last 30 days"]}
-            value={timeRange}
-            onSelect={(val) => setTimeRange(val)}
-            inputClass="!bg-transparent !border-gray-700 !text-gray-300 !py-2 !pl-4 !pr-10 !rounded-full !text-sm  !transition-colors !text-center"
-            optionClass="!bg-[#1C1C1E] !hover:bg-[#15248380] !border-gray-800 !text-gray-300"
-            icon="!text-gray-400 !right-2"
-          />
-        </div>
+      
       </div>
 
       {/* Chart */}

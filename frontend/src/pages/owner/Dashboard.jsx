@@ -125,6 +125,20 @@ export default function Dashboard() {
       trend: stats?.totalOrder?.change || "0%",
       trendText: stats?.totalOrder?.weeklyChange || "+0 this week",
     },
+    {
+      title: "Remaining Minutes",
+      value: stats?.usageOverview?.remainingMinutes
+        ? `${stats.usageOverview.remainingMinutes.toFixed(2)} min`
+        : "0 min",
+      icon: "lucide:clock",
+      iconBg: "bg-[#262626]",
+      trend: stats?.usageOverview?.usedMinutes
+        ? `${stats.usageOverview.usedMinutes.toFixed(2)} min used`
+        : "0 min used",
+      trendText: stats?.usageOverview?.totalLimitMinutes
+        ? `Total: ${stats.usageOverview.totalLimitMinutes} min`
+        : "Total: 0 min",
+    },
   ];
 
   if (isLoading) {
@@ -143,7 +157,7 @@ export default function Dashboard() {
     <div>
       <div className="grid grid-cols-12 gap-5">
         {statsData.map((stat, index) => (
-          <div key={index} className="col-span-12 sm:col-span-12 lg:col-span-4">
+          <div key={index} className="col-span-12 sm:col-span-6 lg:col-span-3">
             <StatCard {...stat} />
           </div>
         ))}

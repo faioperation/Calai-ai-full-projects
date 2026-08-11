@@ -560,11 +560,11 @@ const ViewTenant = () => {
   const orderColumns = [
     {
       key: "callId",
-      Title: "Caller ID",
+      Title: "Number",
       width: "25%",
       render: (row) => (
         <div className="text-left text-gray-200">
-          {row.callId || row.number || row.id || "N/A"}
+          {row.number || row.id || "N/A"}
         </div>
       ),
     },
@@ -1077,7 +1077,7 @@ const ViewTenant = () => {
         </div>
       )}
 
-      {/* View Order Modal */}
+     
       {/* View Order Modal */}
       {selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-white">
