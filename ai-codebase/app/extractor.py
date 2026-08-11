@@ -147,6 +147,4 @@ def generate_uk_restaurant_prompt(
         business_name=resolved_name
     )
 
-    prompt += f"\n\nCRITICAL INSTRUCTION FOR ENDING THE CALL:\nWhen the order is finalized or the conversation is naturally over, you MUST IMMEDIATELY invoke the endCall tool. Do NOT say goodbye yourself. Do NOT generate any text response. Just trigger the tool directly."
-
     return prompt
