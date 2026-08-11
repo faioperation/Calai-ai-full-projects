@@ -1,5 +1,6 @@
 import prisma from "../../../prisma/client.js";
 import { VapiLib } from "../../../lib/vapi.js";
+import { SubscriptionService } from "../subscription/subscription.service.js";
 import {
   startOfDay,
   endOfDay,
@@ -142,6 +143,13 @@ const getDashboardStats = async (userId) => {
     return `${diff >= 0 ? "+" : ""}${diff} this week`;
   };
 
+  // 5. Usage Overview
+  const subData = await SubscriptionService.getMySubscriptionFromDB(userId);
+  const totalLimitMins =
+    subData?.plan?.aiMinutesLimit || subData?.plan?.callMinutesLimit || 0;
+  const usedMins = subData?.aiUsedMinutes || 0;
+  const remainingMins = subData?.remainingAiMinutes || 0;
+
   return {
     totalCallDuration: {
       value: totalDurationFormatted,
@@ -167,6 +175,11 @@ const getDashboardStats = async (userId) => {
         currentPeriod.orders,
         previousPeriod.orders,
       ),
+    },
+    usageOverview: {
+      totalLimitMinutes: totalLimitMins,
+      usedMinutes: usedMins,
+      remainingMinutes: remainingMins,
     },
   };
 };
