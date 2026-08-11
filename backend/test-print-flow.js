@@ -3,7 +3,7 @@ import { PrinterService } from "./src/app/modules/businessowner/printer/printer.
 
 async function main() {
   console.log("🔍 Checking database for Business Owner and Orders...");
-  
+
   // 1. Get the first Business Owner user
   const user = await prisma.user.findFirst({
     where: { role: "BUSINESS_OWNER" },
@@ -27,7 +27,7 @@ async function main() {
   // 3. Find or Create a test printer with MAC "00:11:62:AA:BB:CC" (matching print-bridge.js)
   const printerMac = "00:11:62:AA:BB:CC";
   let printer = await prisma.printer.findFirst({
-    where: { businessId: business.id, serialNumber: printerMac }
+    where: { businessId: business.id, serialNumber: printerMac },
   });
 
   if (!printer) {
@@ -36,34 +36,44 @@ async function main() {
         businessId: business.id,
         deviceName: "Test Receipt Printer",
         serialNumber: printerMac,
-        status: "online"
-      }
+        status: "online",
+      },
     });
-    console.log(`✅ Created test printer in DB: ${printer.deviceName} (${printer.serialNumber})`);
+    console.log(
+      `✅ Created test printer in DB: ${printer.deviceName} (${printer.serialNumber})`,
+    );
   } else {
-    console.log(`Found registered printer: ${printer.deviceName} (${printer.serialNumber})`);
+    console.log(
+      `Found registered printer: ${printer.deviceName} (${printer.serialNumber})`,
+    );
   }
 
   // 4. Find the latest order for this business
   const order = await prisma.order.findFirst({
     where: { businessId: business.id },
-    orderBy: { createdAt: "desc" }
+    orderBy: { createdAt: "desc" },
   });
 
   if (!order) {
-    console.warn("⚠️ No orders found. Running the order seeder to seed a test order first...");
+    console.warn(
+      "⚠️ No orders found. Running the order seeder to seed a test order first...",
+    );
     // Import dynamically to run the order seed
     const seedOrder = await import("./prisma/seed-order.js");
     return;
   }
-  console.log(`Found latest Order: ID: ${order.id}, Customer: ${order.customerName}`);
+  console.log(
+    `Found latest Order: ID: ${order.id}, Customer: ${order.customerName}`,
+  );
 
   // 5. Queue a print job
   console.log("📨 Queueing print job...");
   const jobs = await PrinterService.autoQueueOrderPrint(business.id, order.id);
 
   if (jobs.length === 0) {
-    console.error("❌ Failed to queue print job. Make sure printer is registered.");
+    console.error(
+      "❌ Failed to queue print job. Make sure printer is registered.",
+    );
     return;
   }
   const job = jobs[0];
@@ -76,12 +86,14 @@ async function main() {
   console.log(job.rawReceiptText);
   console.log("================================================\n");
 
-  console.log("💡 You can now run the print bridge to send it to your physical default USB printer:");
+  console.log(
+    "💡 You can now run the print bridge to send it to your physical default USB printer:",
+  );
   console.log("   node print-bridge.js");
 }
 
 main()
-  .catch(err => {
+  .catch((err) => {
     console.error("❌ Test script failed:", err);
   })
   .finally(async () => {

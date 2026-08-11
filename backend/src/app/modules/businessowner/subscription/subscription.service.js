@@ -64,9 +64,11 @@ const checkPlanLimits = async (businessId) => {
   });
 
   const aiUsedMinutes = (aiDurationResult._sum.duration || 0) / 60;
-  const forwardedUsedMinutes = (forwardedDurationResult._sum.duration || 0) / 60;
+  const forwardedUsedMinutes =
+    (forwardedDurationResult._sum.duration || 0) / 60;
 
-  const aiLimit = plan.aiMinutesLimit > 0 ? plan.aiMinutesLimit : plan.callMinutesLimit;
+  const aiLimit =
+    plan.aiMinutesLimit > 0 ? plan.aiMinutesLimit : plan.callMinutesLimit;
   const forwardedLimit = plan.forwardedMinutesLimit || 0;
 
   if (aiLimit > 0 && aiUsedMinutes >= aiLimit) {
@@ -79,7 +81,10 @@ const checkPlanLimits = async (businessId) => {
       reason: `You have exceeded your AI minutes limit of ${aiLimit} minutes. Please upgrade your plan.`,
       remainingMinutes: 0,
       remainingAiMinutes: 0,
-      remainingForwardedMinutes: Math.max(0, forwardedLimit - forwardedUsedMinutes),
+      remainingForwardedMinutes: Math.max(
+        0,
+        forwardedLimit - forwardedUsedMinutes,
+      ),
     };
   }
 
@@ -87,7 +92,10 @@ const checkPlanLimits = async (businessId) => {
     isExceeded: false,
     remainingMinutes: Math.max(0, aiLimit - aiUsedMinutes),
     remainingAiMinutes: Math.max(0, aiLimit - aiUsedMinutes),
-    remainingForwardedMinutes: Math.max(0, forwardedLimit - forwardedUsedMinutes),
+    remainingForwardedMinutes: Math.max(
+      0,
+      forwardedLimit - forwardedUsedMinutes,
+    ),
     aiUsedMinutes: Math.round(aiUsedMinutes * 100) / 100,
     forwardedUsedMinutes: Math.round(forwardedUsedMinutes * 100) / 100,
     subscription: activeSubscription,
@@ -137,7 +145,8 @@ const getMySubscriptionFromDB = async (userId) => {
     ...subscription,
     remainingMinutes: Math.round(limitCheck.remainingMinutes * 100) / 100,
     remainingAiMinutes: Math.round(limitCheck.remainingAiMinutes * 100) / 100,
-    remainingForwardedMinutes: Math.round(limitCheck.remainingForwardedMinutes * 100) / 100,
+    remainingForwardedMinutes:
+      Math.round(limitCheck.remainingForwardedMinutes * 100) / 100,
     aiUsedMinutes: limitCheck.aiUsedMinutes,
     forwardedUsedMinutes: limitCheck.forwardedUsedMinutes,
   };

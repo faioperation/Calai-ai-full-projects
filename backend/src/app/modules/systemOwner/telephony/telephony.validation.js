@@ -5,7 +5,9 @@ const createTelephonySchema = z.object({
     assistant_id: z.string({ required_error: "Assistant ID is required" }),
     twilio_number: z.string({ required_error: "Twilio number is required" }),
     manager_number: z.string({ required_error: "Manager number is required" }),
-    businessId: z.string({ required_error: "Business ID is required" }).uuid("Invalid Business ID format"),
+    businessId: z
+      .string({ required_error: "Business ID is required" })
+      .uuid("Invalid Business ID format"),
   }),
 });
 

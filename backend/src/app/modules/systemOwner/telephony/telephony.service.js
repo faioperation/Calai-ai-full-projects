@@ -192,13 +192,18 @@ const deleteTelephonyFromDB = async (id) => {
 
       const responseStatus = error.response?.status;
       const responseData = error.response?.data;
-      const errorMsg = responseData?.detail || responseData?.message || error.message || "";
+      const errorMsg =
+        responseData?.detail || responseData?.message || error.message || "";
 
       // Check if the error indicates that the resource is not found (already deleted in Vapi/AI service)
       const isNotFound =
         responseStatus === 404 ||
-        (typeof errorMsg === "string" && (errorMsg.includes("404") || errorMsg.toLowerCase().includes("not found"))) ||
-        (responseData && typeof responseData === "object" && JSON.stringify(responseData).includes("404"));
+        (typeof errorMsg === "string" &&
+          (errorMsg.includes("404") ||
+            errorMsg.toLowerCase().includes("not found"))) ||
+        (responseData &&
+          typeof responseData === "object" &&
+          JSON.stringify(responseData).includes("404"));
 
       if (isNotFound) {
         console.log(

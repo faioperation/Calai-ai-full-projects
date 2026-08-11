@@ -133,7 +133,10 @@ const deleteTelephony = async (req, res) => {
 const getUnconfiguredAgents = async (req, res) => {
   try {
     const { businessId } = req.params;
-    const result = await TelephonyService.getUnconfiguredAgentsByBusinessIdFromDB(businessId);
+    const result =
+      await TelephonyService.getUnconfiguredAgentsByBusinessIdFromDB(
+        businessId,
+      );
 
     return res.status(StatusCodes.OK).json({
       success: true,
