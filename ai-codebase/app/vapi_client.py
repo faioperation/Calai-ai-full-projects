@@ -86,9 +86,9 @@ def create_assistant(business_id: str, system_prompt: str, business_name: str = 
             ]
         },
         "voice": {
-            "provider": "11labs",
-            "voiceId": "LZAcK8Cx5QjdQhfBsJQZ",
-            "model": "eleven_flash_v2_5"
+            "model": "gpt-4o-mini-tts",
+            "voiceId": "nova",
+            "provider": "openai"
         },
         "transcriber": {
             "provider": "deepgram",
