@@ -34,7 +34,8 @@ const LiveOrderPopup = () => {
   useEffect(() => {
     // Determine socket URL from API URL
     const baseUrl = import.meta.env.VITE_API_BASE_URL;
-    const socketUrl = baseUrl.replace('/api', '');
+    const urlObj = new URL(baseUrl);
+    const socketUrl = urlObj.origin;
     const token = Cookies.get('Access-Token');
     
     // Extract businessId from user context or token payload
@@ -47,7 +48,7 @@ const LiveOrderPopup = () => {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
         }).join(''));
         const payload = JSON.parse(jsonPayload);
-        businessId = payload.id || payload._id || payload.businessId;
+        businessId = payload.businessId || null;
       } catch (e) {
         console.error("Failed to decode token", e);
       }
