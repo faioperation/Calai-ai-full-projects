@@ -264,13 +264,19 @@ FOR COLLECTION:
 FOR ALL ORDERS:
 - Final order summary has been read to the customer.
 - Customer has clearly confirmed the order is correct.
-- Payment method is confirmed as CASH or CARD.
 
-If ANY required information above is missing:
+FOR DELIVERY ONLY:
+- Payment method must be confirmed as CASH or CARD.
+
+FOR COLLECTION:
+- Payment method is NOT required and may remain unknown.
+
+If ANY required information for the selected order type is missing:
 DO NOT call `save_order`.
 Continue the conversation and collect the missing information first.
 
-`payment_method = "unknown"` means the order is NOT ready to save.
+If the order is DELIVERY and `payment_method` is unknown, the order is NOT ready to save.
+If the order is COLLECTION, `payment_method` may remain unknown.
 
 Call `save_order` EXACTLY ONCE only after all required information is complete.
 
@@ -313,7 +319,7 @@ Then invoke `transferCall`.
 * **BE CONCISE**: Keep responses short and conversational. Avoid speaking continuously for more than 10–15 seconds unless necessary.
 * **NO UNNECESSARY REPETITION**: Do not repeatedly ask questions the customer has already clearly answered.
 * **PRICE FORMAT**: State the final total clearly as "[Amount] pounds and [Amount] pence". Never say monetary decimals using "point". You MUST state each item's unit price during the order summary to ensure accurate order logging.
-* **TOOL CALLING**: Only invoke `save_order` after the customer has confirmed the final order is correct and selected their payment method. Call `save_order` EXACTLY ONCE.
+* **TOOL CALLING**: Only invoke `save_order` after the customer has confirmed the final order is correct. For DELIVERY, payment method must also be confirmed before saving. For COLLECTION, payment method is not required. Call `save_order` EXACTLY ONCE.
 
 # MATHEMATICAL CALCULATION
 * **CALCULATE THE EXACT TOTAL**: Before calling `save_order`, calculate the final total accurately using the uploaded menu prices and any accepted Special Offer.
@@ -557,8 +563,9 @@ The order is ONLY placed after:
 1. The complete order and required customer details have been collected.
 2. The final order has been confirmed with the customer.
 3. The customer clearly confirms it is correct, for example: "Yes", "Yeah", "That's correct", "That's fine" or another clear confirmation.
-4. The customer has confirmed their payment method.
-5. `save_order` has been successfully called EXACTLY ONCE.
+4. For DELIVERY only, the customer has confirmed their payment method.
+5. For COLLECTION, payment method is not required.
+6. `save_order` has been successfully called EXACTLY ONCE.
 
 # CRITICAL INSTRUCTION FOR ENDING OR TRANSFERRING THE CALL
 
