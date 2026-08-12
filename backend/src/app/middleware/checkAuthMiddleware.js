@@ -58,7 +58,8 @@ export const checkAuthMiddleware =
         if (business && business.status === "suspended") {
           return res.status(403).json({
             success: false,
-            message: "Your business account has been suspended by the administrator.",
+            message:
+              "Your business account has been suspended by the administrator.",
           });
         }
       }

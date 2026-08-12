@@ -67,7 +67,8 @@ const downloadOrderPdf = async (req, res, next) => {
     if (jobs.length === 0) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
-        message: "No printers registered for this business. Please register a printer first.",
+        message:
+          "No printers registered for this business. Please register a printer first.",
       });
     }
 

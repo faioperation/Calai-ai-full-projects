@@ -346,6 +346,7 @@ enum TrainingStatus {
 
 enum CallType {
   ai_call
+  forwarded_call
   text_call
 }
 

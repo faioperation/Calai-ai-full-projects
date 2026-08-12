@@ -46,7 +46,10 @@ export const parseMenuFile = async (filePath) => {
       }
 
       // Clean up any trailing dashes, dots, or spaces
-      name = name.replace(/[-.:\s]+$/, "").replace(/^[-.:\s]+/, "").trim();
+      name = name
+        .replace(/[-.:\s]+$/, "")
+        .replace(/^[-.:\s]+/, "")
+        .trim();
 
       return { name, unit };
     };
@@ -56,7 +59,9 @@ export const parseMenuFile = async (filePath) => {
       if (!trimmedLine) continue;
 
       // Check if line contains a price at the end
-      const priceMatch = trimmedLine.match(/(?:£|\$|€)?\s*(\d+(?:\.\d{2})?)\s*$/);
+      const priceMatch = trimmedLine.match(
+        /(?:£|\$|€)?\s*(\d+(?:\.\d{2})?)\s*$/,
+      );
       if (priceMatch) {
         const price = parseFloat(priceMatch[1]);
         const remainingText = trimmedLine.substring(0, priceMatch.index).trim();
@@ -76,7 +81,9 @@ export const parseMenuFile = async (filePath) => {
           trimmedLine.length > 2 &&
           trimmedLine.length < 35 &&
           /^[a-z0-9\s&'-]+$/i.test(trimmedLine) &&
-          !/^(date|time|phone|customer|order|total|subtotal|items)/i.test(trimmedLine);
+          !/^(date|time|phone|customer|order|total|subtotal|items)/i.test(
+            trimmedLine,
+          );
 
         if (isPotentialCategory) {
           currentCategory = trimmedLine;

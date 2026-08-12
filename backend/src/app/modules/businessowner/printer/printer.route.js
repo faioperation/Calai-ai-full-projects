@@ -12,10 +12,7 @@ router.get(
   PrinterController.getPrinters,
 );
 
-router.get(
-  "/download-bridge",
-  PrinterController.downloadPrintBridge,
-);
+router.get("/download-bridge", PrinterController.downloadPrintBridge);
 
 router.get(
   "/:id",

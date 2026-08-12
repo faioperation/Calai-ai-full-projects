@@ -173,11 +173,12 @@ const getPrinterById = async (userId, printerId) => {
   return printer;
 };
 
-// Formats an order to clean plain ASCII monospaced receipt text (48 chars wide)
+// Formats an order to clean plain ESC/POS receipt text (40 chars wide)
 const generateReceiptText = (order, businessSettings, contactInfo) => {
-  const width = 48; // Standard width for 80mm POS receipt printers
+  const width = 40; // Safe standard width for 80mm & 58mm POS receipt printers (prevents line wrapping overflow)
   const separator = "=".repeat(width);
   const dashedLine = "-".repeat(width);
+  const curr = "£"; // Standard currency symbol £
 
   const center = (text) => {
     if (!text) return "";
@@ -301,7 +302,7 @@ const generateReceiptText = (order, businessSettings, contactInfo) => {
     const itemTotal = parseFloat(item.total_price || qty * unitPrice);
 
     const leftText = `${qty}x ${name}`;
-    const rightText = `£${itemTotal.toFixed(2)}`;
+    const rightText = `${curr}${itemTotal.toFixed(2)}`;
 
     if (leftText.length + rightText.length >= width) {
       lines.push(leftText.substring(0, width));
@@ -314,8 +315,8 @@ const generateReceiptText = (order, businessSettings, contactInfo) => {
 
   // Totals
   const total = parseFloat(order.totalPrice || 0);
-  lines.push(formatTwoColumns("Subtotal:", `£${total.toFixed(2)}`));
-  lines.push(formatTwoColumns("TOTAL:", `£${total.toFixed(2)}`));
+  lines.push(formatTwoColumns("Subtotal:", `${curr}${total.toFixed(2)}`));
+  lines.push(formatTwoColumns("TOTAL:", `${curr}${total.toFixed(2)}`));
   lines.push(dashedLine);
 
   lines.push(center("Thank you for your order!"));
