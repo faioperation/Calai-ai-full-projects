@@ -45,7 +45,7 @@ const AiTraining = () => {
               <UploadPdf />
             </div>
             {/* Recent Training List */}
-            <RecentTrainingList />
+            {/* <RecentTrainingList /> */}
           </div>
         )}
 
