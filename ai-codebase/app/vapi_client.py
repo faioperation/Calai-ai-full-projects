@@ -88,8 +88,10 @@ def create_assistant(business_id: str, system_prompt: str, business_name: str = 
         "voice": {
             "model": "gpt-4o-mini-tts",
             "voiceId": "nova",
-            "provider": "openai"
+            "provider": "openai",
+            "backgroundSound": "off"
         },
+        "backgroundSound": "off",
         "transcriber": {
             "provider": "deepgram",
             "model": "nova-3",
@@ -113,6 +115,7 @@ def create_assistant(business_id: str, system_prompt: str, business_name: str = 
                 "schema": {
                     "type": "object",
                     "properties": {
+                        "customer_confirmed": {"type": "boolean"},
                         "items": {
                             "type": "array",
                             "items": {
@@ -132,12 +135,12 @@ def create_assistant(business_id: str, system_prompt: str, business_name: str = 
                         "delivery_type": {"type": "string", "enum": ["pickup", "delivery"]},
                         "delivery_address": {"type": "string"}
                     },
-                    "required": ["items", "total_price", "order_status", "customer_name", "delivery_type", "delivery_address"]
+                    "required": ["customer_confirmed", "items", "total_price", "order_status", "customer_name", "delivery_type", "delivery_address"]
                 },
                 "messages": [
                     {
                         "role": "system",
-                        "content": "Extract the final order details for database logging. For each item in 'items', extract 'product_name', 'quantity' (as a string), and 'unit_prize' (the price of ONE unit as a decimal string, e.g. '22.09', '24.10', '5.83').\n\nFor unit_prize, use this priority order:\n1. FIRST: Look for individual item prices spoken in the transcript (e.g. 'at eight pounds fifty each', 'at ten pounds'). Convert spoken prices to decimal strings (e.g. 'eight pounds fifty' = '8.50').\n2. FALLBACK: If a specific item price was NOT spoken but the total_price and all quantities are known, calculate unit prices that sum to the stated total. Use common UK restaurant pricing (whole numbers or .50/.95/.99 endings).\n3. NEVER output 'unknown', '0.0', or '0' for unit_prize. You MUST always provide a realistic numeric decimal string.\n\nFor 'total_price', DO NOT attempt to calculate it yourself; output the final total price stated by the assistant to the customer. The delivery_type MUST be exactly 'pickup' or 'delivery'. If delivery_type is 'delivery', extract the 'delivery_address' from the transcript. If it's 'pickup', set 'delivery_address' to 'N/A' or an empty string.\n\nJson Schema:\n{{schema}}\n\nOnly respond with the JSON."
+                        "content": "Extract the final order details for database logging. Extract customer_confirmed (boolean true/false based on explicit verbal confirmation). For each item in 'items', extract 'product_name', 'quantity' (as a string), and 'unit_prize' (the price of ONE unit as a decimal string, e.g. '22.09', '24.10', '5.83').\n\nFor unit_prize, use this priority order:\n1. FIRST: Look for individual item prices spoken in the transcript (e.g. 'at eight pounds fifty each', 'at ten pounds'). Convert spoken prices to decimal strings (e.g. 'eight pounds fifty' = '8.50').\n2. FALLBACK: If a specific item price was NOT spoken but the total_price and all quantities are known, calculate unit prices that sum to the stated total. Use common UK restaurant pricing (whole numbers or .50/.95/.99 endings).\n3. NEVER output 'unknown', '0.0', or '0' for unit_prize. You MUST always provide a realistic numeric decimal string.\n\nFor 'total_price', DO NOT attempt to calculate it yourself; output the final total price stated by the assistant to the customer. The delivery_type MUST be exactly 'pickup' or 'delivery'. If delivery_type is 'delivery', extract the 'delivery_address' from the transcript. If it's 'pickup', set 'delivery_address' to 'N/A' or an empty string.\n\nJson Schema:\n{{schema}}\n\nOnly respond with the JSON."
                     },
                     {
                         "role": "user",
@@ -187,6 +190,28 @@ def create_assistant(business_id: str, system_prompt: str, business_name: str = 
                 "server": {
                     "url": vapi_server_url,
                     "timeoutSeconds": 20
+                },
+                "function": {
+                    "name": "save_order",
+                    "description": "Saves the completed order ONLY after explicit verbal confirmation from the customer. Requires customer_confirmed=true.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "customer_confirmed": {
+                                "type": "boolean",
+                                "description": "MUST be true. Explicit verbal confirmation received from customer for order summary and payment method."
+                            },
+                            "customer_name": {"type": "string"},
+                            "customer_email": {"type": "string"},
+                            "order_items": {"type": "string", "description": "JSON string of order details"},
+                            "total_price": {"type": "number"},
+                            "payment_method": {"type": "string"},
+                            "delivery_type": {"type": "string"},
+                            "delivery_address": {"type": "string"},
+                            "customer_phone": {"type": "string"}
+                        },
+                        "required": ["customer_confirmed", "order_items", "total_price"]
+                    }
                 }
             }
             tool_patch_res = requests.patch(tool_patch_url, headers=HEADERS, json=tool_patch_payload)
