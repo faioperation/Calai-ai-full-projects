@@ -107,8 +107,7 @@ ${itemsText}
 Order type: ${orderRecord.orderType === "DELIVERY" ? "Delivery" : "Collection"}
 Customer: ${orderRecord.customerName || "N/A"}
 Contact number: ${callbackNumber}
-${orderRecord.orderType === "DELIVERY" ? `Delivery address: ${orderRecord.deliveryAddress || "N/A"}\n` : ""}Payment: Cash
-Total: £${Number(orderRecord.totalPrice || 0).toFixed(2)}
+${orderRecord.orderType === "DELIVERY" ? `Delivery address: ${orderRecord.deliveryAddress || "N/A"}\n` : ""}Total: £${Number(orderRecord.totalPrice || 0).toFixed(2)}
 Order status: Confirmed
 
 Calai`;
