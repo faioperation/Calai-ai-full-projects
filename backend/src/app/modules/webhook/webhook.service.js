@@ -3,6 +3,7 @@ import { SubscriptionService } from "../businessowner/subscription/subscription.
 import { PrinterService } from "../businessowner/printer/printer.service.js";
 import { notifyNewOrder } from "../../utils/socket.js";
 import { VapiLib } from "../../lib/vapi.js";
+import { sendEmail } from "../../utils/sendEmail.js";
 
 /**
  * Helper to parse and validate Order Type and Delivery Address.
@@ -47,6 +48,81 @@ const parseOrderTypeAndAddress = (data, callStartTime) => {
   }
 
   return { orderType, deliveryAddress, pickupTime };
+};
+
+/**
+ * Helper to send email confirmation of the order to the business owner
+ */
+const sendOrderConfirmationEmail = async (businessId, orderRecord) => {
+  try {
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      include: { owner: true }
+    });
+
+    if (!business || !business.owner?.email) {
+      console.log(`⚠️ Skip sending email: No business owner email found for business ${businessId}`);
+      return;
+    }
+
+    const recipientEmail = business.owner.email;
+    const callRecord = await prisma.call.findUnique({
+      where: { id: orderRecord.callId }
+    });
+    const callbackNumber = callRecord?.customerNumber || "N/A";
+
+    // Format items list
+    let itemsText = "";
+    let itemsList = [];
+    if (orderRecord.items) {
+      if (typeof orderRecord.items === "string") {
+        try {
+          itemsList = JSON.parse(orderRecord.items);
+        } catch (e) {
+          itemsList = [];
+        }
+      } else if (Array.isArray(orderRecord.items)) {
+        itemsList = orderRecord.items;
+      }
+    }
+
+    if (itemsList.length > 0) {
+      itemsText = itemsList.map(item => {
+        const name = item.product_name || item.item_name || item.name || "Item";
+        const qty = parseInt(item.quantity) || 1;
+        const unitPrice = parseFloat(
+          item.unit_prize || item.unit_price || item.price || 0
+        );
+        const itemTotal = parseFloat(item.total_price || qty * unitPrice);
+        return `- ${qty}x ${name} (£${itemTotal.toFixed(2)})`;
+      }).join("\n");
+    } else {
+      itemsText = "No items specified";
+    }
+
+    const emailSubject = "New order confirmed through Calai.";
+    const emailBody = `Order:
+${itemsText}
+
+Order type: ${orderRecord.orderType === "DELIVERY" ? "Delivery" : "Collection"}
+Customer: ${orderRecord.customerName || "N/A"}
+Contact number: ${callbackNumber}
+${orderRecord.orderType === "DELIVERY" ? `Delivery address: ${orderRecord.deliveryAddress || "N/A"}\n` : ""}Payment: Cash
+Total: £${Number(orderRecord.totalPrice || 0).toFixed(2)}
+Order status: Confirmed
+
+Calai`;
+
+    await sendEmail({
+      to: recipientEmail,
+      subject: emailSubject,
+      text: emailBody
+    });
+    
+    console.log(`📧 Order confirmation email successfully sent to ${recipientEmail}`);
+  } catch (error) {
+    console.error("❌ Failed to send order confirmation email:", error);
+  }
 };
 
 /**
@@ -134,9 +210,7 @@ const processVapiWebhook = async (payload) => {
       payload.assistant?.id;
 
     if (!assistantId) {
-      console.error(
-        "❌ Webhook Error: No assistantId found in assistant-request payload",
-      );
+      console.error("❌ Webhook Error: No assistantId found in assistant-request payload");
       return { success: false, message: "No assistantId provided" };
     }
 
@@ -155,23 +229,19 @@ const processVapiWebhook = async (payload) => {
     const limits = await SubscriptionService.checkPlanLimits(agent.businessId);
 
     if (limits.isExceeded) {
-      console.log(
-        `🚫 Call Blocked: Business ${agent.businessId} has exceeded plan limits. Reason: ${limits.reason}`,
-      );
+      console.log(`🚫 Call Blocked: Business ${agent.businessId} has exceeded plan limits. Reason: ${limits.reason}`);
       return {
         isAssistantRequestResponse: true,
         assistant: {
           name: "Limit Exceeded",
-          firstMessage:
-            "Hello. This business has run out of calling minutes. Please upgrade your subscription to resume calls. Goodbye.",
+          firstMessage: "Hello. This business has run out of calling minutes. Please upgrade your subscription to resume calls. Goodbye.",
           model: {
             provider: "openai",
             model: "gpt-4o-mini",
             messages: [
               {
                 role: "system",
-                content:
-                  "You are an automated message receptionist. You must politely inform the caller: 'This business has run out of calling minutes. Please upgrade your subscription to resume calls. Goodbye.' and then immediately hang up.",
+                content: "You are an automated message receptionist. You must politely inform the caller: 'This business has run out of calling minutes. Please upgrade your subscription to resume calls. Goodbye.' and then immediately hang up.",
               },
             ],
           },
@@ -293,10 +363,7 @@ const processVapiWebhook = async (payload) => {
       },
     });
 
-    const { orderType, deliveryAddress, pickupTime } = parseOrderTypeAndAddress(
-      payload,
-      call.startTime,
-    );
+    const { orderType, deliveryAddress, pickupTime } = parseOrderTypeAndAddress(payload, call.startTime);
 
     const orderRecord = await prisma.order.upsert({
       where: { callId: call.id },
@@ -346,6 +413,7 @@ const processVapiWebhook = async (payload) => {
 
     await PrinterService.autoQueueOrderPrint(agent.businessId, orderRecord.id);
     await notifyNewOrder(orderRecord.id);
+    sendOrderConfirmationEmail(agent.businessId, orderRecord);
 
     return { success: true, callId: call.id };
   }
@@ -463,13 +531,8 @@ const processVapiWebhook = async (payload) => {
         const customerEmail =
           args.customer_email || args.customerEmail || args.email || "N/A";
 
-        const {
-          orderType,
-          deliveryAddress: parsedAddress,
-          pickupTime,
-        } = parseOrderTypeAndAddress(args, call?.startTime);
-        const deliveryAddress =
-          parsedAddress || vapiCall?.customer?.address || null;
+        const { orderType, deliveryAddress: parsedAddress, pickupTime } = parseOrderTypeAndAddress(args, call?.startTime);
+        const deliveryAddress = parsedAddress || vapiCall?.customer?.address || null;
 
         if (call) {
           const orderRecord = await prisma.order.upsert({
@@ -498,9 +561,10 @@ const processVapiWebhook = async (payload) => {
           console.log(
             `✅ Order synced successfully in tool call! Total: £${totalPrice}`,
           );
-
+          
           await PrinterService.autoQueueOrderPrint(businessId, orderRecord.id);
           await notifyNewOrder(orderRecord.id);
+          sendOrderConfirmationEmail(businessId, orderRecord);
         }
 
         results.push({
@@ -680,13 +744,8 @@ const processVapiWebhook = async (payload) => {
       structuredData.email ||
       "N/A";
 
-    const {
-      orderType,
-      deliveryAddress: parsedAddress,
-      pickupTime,
-    } = parseOrderTypeAndAddress(structuredData, call.startTime);
-    const deliveryAddress =
-      parsedAddress || vapiCall?.customer?.address || null;
+    const { orderType, deliveryAddress: parsedAddress, pickupTime } = parseOrderTypeAndAddress(structuredData, call.startTime);
+    const deliveryAddress = parsedAddress || vapiCall?.customer?.address || null;
 
     // Only create order if there are items or a price
     if (orderItems.length > 0 || totalPrice > 0) {
@@ -716,6 +775,7 @@ const processVapiWebhook = async (payload) => {
 
       await PrinterService.autoQueueOrderPrint(businessId, orderRecord.id);
       await notifyNewOrder(orderRecord.id);
+      sendOrderConfirmationEmail(businessId, orderRecord);
     }
   }
 
