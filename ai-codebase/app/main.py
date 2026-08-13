@@ -35,7 +35,15 @@ def parse_single_string_item(item_str: str) -> dict:
         "unit_prize": "0.0"
     }
 
-def normalize_list(items) -> list:
+def is_customer_confirmed(val) -> bool:
+    """Helper to check if customer_confirmed is explicitly true."""
+    if val is True:
+        return True
+    if isinstance(val, str) and val.strip().lower() in ["true", "1", "yes"]:
+        return True
+    return False
+
+def normalize_list(items, total_price=None) -> list:
     normalized = []
     if not isinstance(items, list):
         items = [items]
@@ -44,9 +52,6 @@ def normalize_list(items) -> list:
             product_name = item.get("product_name") or item.get("name") or item.get("item") or "Unknown Product"
             quantity = item.get("quantity") or item.get("qty") or item.get("count") or "1"
             unit_prize = item.get("unit_prize") or item.get("unit_price") or item.get("price")
-
-#           if unit_prize is not None:
-#                unit_prize = str(unit_prize)
 
             if unit_prize is not None and str(unit_prize).strip().lower() not in ["", "unknown", "none", "null"]:
                 import re
@@ -66,6 +71,22 @@ def normalize_list(items) -> list:
             parsed_item = parse_single_string_item(item)
             if parsed_item:
                 normalized.append(parsed_item)
+
+    # Fallback price calculation: if unit_prize is 0.0 but total_price is provided, estimate unit_prize
+    if total_price:
+        try:
+            tot = float(total_price)
+            if tot > 0:
+                zero_items = [i for i in normalized if float(i.get("unit_prize", 0) or 0) == 0]
+                if zero_items:
+                    total_qty = sum(float(i.get("quantity", 1) or 1) for i in normalized)
+                    if total_qty > 0:
+                        avg_unit = round(tot / total_qty, 2)
+                        for item in zero_items:
+                            item["unit_prize"] = str(avg_unit)
+        except (ValueError, TypeError):
+            pass
+
     return normalized
 
 def parse_and_format_order_details(order_items, total_price) -> list:
@@ -90,23 +111,23 @@ def parse_and_format_order_details(order_items, total_price) -> list:
                 import json
                 parsed = json.loads(cleaned)
                 if isinstance(parsed, dict) and "order_details" in parsed:
-                    return normalize_list(parsed["order_details"])
+                    return normalize_list(parsed["order_details"], total_price)
                 if isinstance(parsed, dict):
-                    return normalize_list([parsed])
+                    return normalize_list([parsed], total_price)
                 if isinstance(parsed, list):
-                    return normalize_list(parsed)
+                    return normalize_list(parsed, total_price)
             except Exception:
                 pass
 
     # Case 2: If it is already a dictionary
     if isinstance(order_items, dict):
         if "order_details" in order_items:
-            return normalize_list(order_items["order_details"])
-        return normalize_list([order_items])
+            return normalize_list(order_items["order_details"], total_price)
+        return normalize_list([order_items], total_price)
 
     # Case 3: If it is already a list
     if isinstance(order_items, list):
-        return normalize_list(order_items)
+        return normalize_list(order_items, total_price)
 
     # Case 4: Unstructured string fallback (e.g., "2x Cola, 2x pizza")
     parsed_items = []
@@ -158,11 +179,11 @@ def parse_and_format_order_details(order_items, total_price) -> list:
             import json
             parsed = json.loads(content)
             if isinstance(parsed, list):
-                return normalize_list(parsed)
+                return normalize_list(parsed, total_price)
         except Exception as e:
             print(f" OpenAI parsing failed, using regex fallback: {str(e)}")
             
-    return parsed_items
+    return normalize_list(parsed_items, total_price)
 
 app = FastAPI(title="Vapi AI Microservice")
 
@@ -637,6 +658,7 @@ def forward_order_task(business_id: str, assistant_id: str, args: dict):
                 "business_id": business_id,
                 "customer_name": args.get("customer_name"),
                 "customer_email": args.get("customer_email"),
+                "customer_confirmed": True,
                 "order_items": args.get("order_items"),  # KEEP original key for backward compatibility
                 "order_details": order_details,          # ADD new requested JSON format
                 "items": order_details,                  # ADD items key matching user requested schema
@@ -651,27 +673,34 @@ def forward_order_task(business_id: str, assistant_id: str, args: dict):
 
 @app.post("/webhook/order")
 async def handle_order(request: Request, background_tasks: BackgroundTasks):
-    """Receives the LIVE ORDER tool call from Vapi"""
+    """Receives the LIVE ORDER tool call from Vapi with Hard Confirmation Gate enforcement"""
     body = await request.body()
     if not body:
         return {"status": "error", "message": "Empty request body"}
     
     data = await request.json()
-    
-    # DEBUG: Print raw data to see exactly what Vapi sends
-    # print(f"DEBUG ORDER DATA: {data}")
 
     # For apiRequest tools, Vapi sends the arguments directly in the root or inside 'message'
     if "customer_name" in data:
         # This is a flat apiRequest tool call
         args = data
         business_id = "Dashboard Tool"
-        assistant_id = "Unknown" # Flat API requests usually don't send this outside headers
+        assistant_id = "Unknown"
+
+        # HARD CONFIRMATION GATE CHECK
+        if not is_customer_confirmed(args.get("customer_confirmed")):
+            print("❌ ORDER REJECTED: Hard confirmation gate failed (customer_confirmed is not True).")
+            return {
+                "status": "error",
+                "message": "Order rejected: save_order requires customer_confirmed=true. Explicit verbal confirmation from the customer is mandatory before calling save_order."
+            }
+
         import json
         formatted_details = parse_and_format_order_details(args.get("order_items"), args.get("total_price"))
-        print(f"\n---  NEW ORDER RECEIVED for {business_id} ---")
+        print(f"\n--- 🍕 NEW ORDER RECEIVED for {business_id} ---")
         print(f"Customer: {args.get('customer_name')}")
         print(f"Email: {args.get('customer_email')}")
+        print(f"Customer Confirmed: {args.get('customer_confirmed')}")
         print(f"Items (Raw): {args.get('order_items')}")
         print(f"Items (Structured JSON): {json.dumps({'order_details': formatted_details}, indent=2)}")
         print(f"Total: £{args.get('total_price')}")
@@ -714,12 +743,22 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
                     args = {}
             business_id = message.get("customer", {}).get("metadata", {}).get("business_id", "Unknown")
 
+            # HARD CONFIRMATION GATE CHECK
+            if not is_customer_confirmed(args.get("customer_confirmed")):
+                print(f"❌ ORDER REJECTED for {business_id}: Hard confirmation gate failed (customer_confirmed is not True).")
+                results.append({
+                    "toolCallId": tool_call.get("id"),
+                    "result": "ERROR: Order rejected by backend. save_order requires customer_confirmed=true. Explicit verbal confirmation of the final summary and payment method MUST be received before invoking save_order."
+                })
+                continue
+
             import json
             formatted_details = parse_and_format_order_details(args.get("order_items"), args.get("total_price"))
             print(f"\n--- 🍕 NEW ORDER RECEIVED for {business_id} ---")
             print(f"Assistant ID: {assistant_id}")
             print(f"Customer: {args.get('customer_name')}")
             print(f"Email: {args.get('customer_email')}")
+            print(f"Customer Confirmed: {args.get('customer_confirmed')}")
             print(f"Items (Raw): {args.get('order_items')}")
             print(f"Items (Structured JSON): {json.dumps({'order_details': formatted_details}, indent=2)}")
             print(f"Total: £{args.get('total_price')}")
