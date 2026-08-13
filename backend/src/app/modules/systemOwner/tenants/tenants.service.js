@@ -282,12 +282,26 @@ const deleteTenantFromDB = async (id) => {
       });
     }
 
+    // Delete relation-dependent records first to prevent foreign key errors
+    await tx.orderItem.deleteMany({
+      where: { order: { businessId: id } },
+    });
+    await tx.printJob.deleteMany({
+      where: { printer: { businessId: id } },
+    });
+
+    // Delete printer, order, items, agents
+    await tx.printer.deleteMany({ where: { businessId: id } });
+    await tx.order.deleteMany({ where: { businessId: id } });
+    await tx.item.deleteMany({ where: { businessId: id } });
+    await tx.agent.deleteMany({ where: { businessId: id } });
+
     // Delete business-related records
     await tx.trainingSession.deleteMany({ where: { businessId: id } });
     await tx.call.deleteMany({ where: { businessId: id } });
     await tx.invoice.deleteMany({ where: { businessId: id } });
     await tx.subscription.deleteMany({ where: { businessId: id } });
-    await tx.apiKey.deleteMany({ where: { businessId: id } });
+    await tx.apiKey.deleteMany({ where: { userId: ownerId } });
     await tx.usageLog.deleteMany({ where: { businessId: id } });
     await tx.userBusiness.deleteMany({ where: { businessId: id } });
     await tx.businessSetting.deleteMany({ where: { businessId: id } });

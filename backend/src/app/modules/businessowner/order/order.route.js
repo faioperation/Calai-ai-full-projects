@@ -18,7 +18,7 @@ router.get(
 
 router.get(
   "/download/:id",
-  checkAuthMiddleware("BUSINESS_OWNER"),
+  checkAuthMiddleware("BUSINESS_OWNER", "SYSTEM_OWNER"),
   OrderController.downloadOrderPdf,
 );
 
