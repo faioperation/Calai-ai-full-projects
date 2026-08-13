@@ -88,10 +88,8 @@ def create_assistant(business_id: str, system_prompt: str, business_name: str = 
         "voice": {
             "model": "gpt-4o-mini-tts",
             "voiceId": "nova",
-            "provider": "openai",
-            "backgroundSound": "off"
+            "provider": "openai"
         },
-        "backgroundSound": "off",
         "transcriber": {
             "provider": "deepgram",
             "model": "nova-3",
