@@ -34,21 +34,27 @@ export const sendEmail = async ({
   templateName,
   templateData = {},
   attachments = [],
+  text,
+  html,
 }) => {
   try {
-    const templatePath = path.join(
-      __dirname,
-      "template",
-      `${templateName}.ejs`,
-    );
+    let htmlContent = html;
 
-    const html = await ejs.renderFile(templatePath, templateData);
+    if (templateName) {
+      const templatePath = path.join(
+        __dirname,
+        "template",
+        `${templateName}.ejs`,
+      );
+      htmlContent = await ejs.renderFile(templatePath, templateData);
+    }
 
     const info = await transporter.sendMail({
       from: envVars.EMAIL_SENDER.SMTP_FROM,
       to,
       subject,
-      html,
+      ...(htmlContent ? { html: htmlContent } : {}),
+      ...(text ? { text } : {}),
       attachments: attachments.map((file) => ({
         filename: file.filename,
         content: file.content,
