@@ -18,9 +18,8 @@ const handleError = (res, error, context = "Business Hour Management") => {
 
 const getBusinessHour = async (req, res) => {
   try {
-    const { businessId } = req.params;
-    const result =
-      await BusinessHourService.getBusinessHourByBusinessId(businessId);
+    const userId = req.user.id;
+    const result = await BusinessHourService.getBusinessHourByUserId(userId);
 
     return res.status(StatusCodes.OK).json({
       success: true,
@@ -34,9 +33,9 @@ const getBusinessHour = async (req, res) => {
 
 const updateBusinessHour = async (req, res) => {
   try {
-    const { businessId } = req.params;
+    const userId = req.user.id;
     const result = await BusinessHourService.updateBusinessHour(
-      businessId,
+      userId,
       req.body,
     );
 
