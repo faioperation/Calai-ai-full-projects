@@ -19,7 +19,7 @@ import { WebhookRouter } from "../modules/webhook/webhook.route.js";
 import { ItemManagementRouter } from "../modules/businessowner/item_management/item_management.route.js";
 import { FreeRouter } from "../modules/freeRoute/freeRoute.route.js";
 import { IndividualTenantRouter } from "../modules/systemOwner/individual_tenant/individual_tenant.route.js";
-import { BusinessHourRouter } from "../modules/systemOwner/business_hour/business_hour.route.js";
+import { BusinessHourRouter } from "../modules/businessowner/business_hour/business_hour.route.js";
 import { PrinterRouter } from "../modules/businessowner/printer/printer.route.js";
 import { DevicePrinterRouter } from "../modules/businessowner/printer/device-printer.route.js";
 
@@ -83,15 +83,15 @@ const moduleRoutes = [
     route: SystemOwnerAIAgentRouter,
   },
 
-  {
-    path: "/system-owner/business-hour",
-    route: BusinessHourRouter,
-  },
-
   // Business Owner Routes
   {
     path: "/business-owner/settings",
     route: BusinessOwnerSettingsRouter,
+  },
+
+  {
+    path: "/business-owner/business-hour",
+    route: BusinessHourRouter,
   },
 
   {
