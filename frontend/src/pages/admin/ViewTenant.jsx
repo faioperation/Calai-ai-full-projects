@@ -117,48 +117,65 @@ const ViewTenant = () => {
     try {
       const toastId = toast.loading("Preparing print...");
       const res = await axiosSecure.get(
-        `/system-owner/individual-tenant/download/${selectedOrder.id}`,
+        `/business-owner/order/download/${selectedOrder.id}`,
         {
-          responseType: "blob",
+          responseType: "text",
         },
       );
-      const url = window.URL.createObjectURL(
-        new Blob([res.data], { type: "application/pdf" }),
-      );
       toast.dismiss(toastId);
-      const printWindow = window.open(url);
+      
+      const printWindow = window.open("", "_blank");
       if (printWindow) {
-        printWindow.onload = () => {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Print Receipt</title>
+              <style>
+                body {
+                  font-family: monospace;
+                  white-space: pre;
+                  padding: 20px;
+                  margin: 0;
+                  font-size: 14px;
+                }
+              </style>
+            </head>
+            <body>${res.data}</body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
           printWindow.print();
-        };
+        }, 100);
       }
     } catch (err) {
       console.error(err);
-      toast.error("Failed to prepare print");
+      toast.error("Failed to prepare print. Please connect your printer.");
     }
   };
 
   const handleDownloadOrder = async () => {
     if (!selectedOrder) return;
     try {
-      const toastId = toast.loading("Downloading invoice...");
+      const toastId = toast.loading("Downloading receipt...");
       const res = await axiosSecure.get(
-        `/system-owner/individual-tenant/download/${selectedOrder.id}`,
+        `/business-owner/order/download/${selectedOrder.id}`,
         {
-          responseType: "blob",
+          responseType: "text",
         },
       );
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "text/plain" }));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `Invoice_${selectedOrder.id}.pdf`);
+      link.setAttribute("download", `Receipt_${selectedOrder.id}.txt`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
       toast.success("Download complete", { id: toastId });
     } catch (err) {
       console.error(err);
-      toast.error("Failed to download invoice");
+      toast.error("Failed to download receipt.");
     }
   };
 
