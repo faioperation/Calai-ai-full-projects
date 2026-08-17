@@ -659,16 +659,64 @@ def forward_order_task(business_id: str, assistant_id: str, args: dict):
                 "customer_name": args.get("customer_name"),
                 "customer_email": args.get("customer_email"),
                 "customer_confirmed": True,
+                "order_status": "confirmed",
                 "order_items": args.get("order_items"),  # KEEP original key for backward compatibility
                 "order_details": order_details,          # ADD new requested JSON format
                 "items": order_details,                  # ADD items key matching user requested schema
                 "total_price": args.get("total_price"),
+                "payment_method": args.get("payment_method", "unknown"),
+                "delivery_type": args.get("delivery_type", "unknown"),
+                "delivery_address": args.get("delivery_address", ""),
+                "customer_phone": args.get("customer_phone", ""),
                 "source": "vapi_voice_agent"
             }
             requests.post(EXTERNAL_BACKEND_URL, json=forward_payload, timeout=5)
             print(f" Order forwarded to {EXTERNAL_BACKEND_URL}")
         except Exception as e:
             print(f" Failed to forward order: {str(e)}")
+
+
+def forward_summary_task(business_id: str, assistant_id: str,
+                         structured_data: dict, summary: str, ended_reason: str):
+    """Forwards post-call structured data to the external backend"""
+    if not EXTERNAL_BACKEND_URL:
+        return
+    try:
+        # Determine order status from structured data
+        order_status = structured_data.get("order_status", "abandoned")
+        customer_confirmed = structured_data.get("customer_confirmed", False)
+
+        # Safety: if customer didn't confirm, force status to abandoned
+        if not customer_confirmed and order_status == "completed":
+            order_status = "abandoned"
+
+        # Safety: if total is 0/None and status is completed, mark as abandoned
+        total_price = structured_data.get("total_price", 0)
+        if (total_price is None or total_price == 0) and order_status == "completed":
+            order_status = "abandoned"
+
+        summary_payload = {
+            "type": "call_summary",
+            "assistantId": assistant_id,
+            "business_id": business_id,
+            "order_status": order_status,
+            "customer_confirmed": customer_confirmed,
+            "customer_name": structured_data.get("customer_name", ""),
+            "items": structured_data.get("items", []),
+            "total_price": total_price,
+            "payment_method": structured_data.get("payment_method", "unknown"),
+            "delivery_type": structured_data.get("delivery_type", "unknown"),
+            "delivery_address": structured_data.get("delivery_address", ""),
+            "ai_summary": summary,
+            "ended_reason": ended_reason,
+            "source": "vapi_post_call_analysis"
+        }
+
+        requests.post(EXTERNAL_BACKEND_URL, json=summary_payload, timeout=5)
+        print(f" Call summary forwarded to {EXTERNAL_BACKEND_URL} (status: {order_status})")
+    except Exception as e:
+        print(f" Failed to forward call summary: {str(e)}")
+
 
 
 @app.post("/webhook/order")
@@ -694,6 +742,17 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
                 "status": "error",
                 "message": "Order rejected: save_order requires customer_confirmed=true. Explicit verbal confirmation from the customer is mandatory before calling save_order."
             }
+
+        # TOTAL PRICE SANITY CHECK
+        total_price = args.get("total_price")
+        try:
+            total_price_float = float(total_price) if total_price is not None else 0.0
+        except (ValueError, TypeError):
+            total_price_float = 0.0
+
+        if total_price_float <= 0:
+            print(f"⚠️ ORDER WARNING for {business_id}: total_price is £{total_price}. Order will be forwarded but flagged.")
+            args["_warning"] = "total_price_zero_or_missing"
 
         import json
         formatted_details = parse_and_format_order_details(args.get("order_items"), args.get("total_price"))
@@ -754,6 +813,18 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
 
             import json
             formatted_details = parse_and_format_order_details(args.get("order_items"), args.get("total_price"))
+
+            # TOTAL PRICE SANITY CHECK
+            total_price = args.get("total_price")
+            try:
+                total_price_float = float(total_price) if total_price is not None else 0.0
+            except (ValueError, TypeError):
+                total_price_float = 0.0
+
+            if total_price_float <= 0:
+                print(f"⚠️ ORDER WARNING for {business_id}: total_price is £{total_price}. Order will be forwarded but flagged.")
+                args["_warning"] = "total_price_zero_or_missing"
+
             print(f"\n--- 🍕 NEW ORDER RECEIVED for {business_id} ---")
             print(f"Assistant ID: {assistant_id}")
             print(f"Customer: {args.get('customer_name')}")
@@ -776,7 +847,7 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
         return {"results": results}
 
 @app.post("/webhook/summary")
-async def handle_summary(request: Request):
+async def handle_summary(request: Request, background_tasks: BackgroundTasks):
     """Receives the POST-CALL summary from Vapi"""
     data = await request.json()
     
@@ -793,14 +864,24 @@ async def handle_summary(request: Request):
 
     business_id = call_data.get("metadata", {}).get("business_id", "Unknown")
     structured_data = analysis.get("structuredData")
+    assistant_id = call_data.get("assistantId", "Unknown")
+    ended_reason = call_data.get("endedReason", "unknown")
 
     print(f"\n---  FINAL CALL SUMMARY for {business_id} ---")
     print(f"AI Summary: {summary}")
     if structured_data:
         import json
         print(f"Structured Data: {json.dumps(structured_data, indent=2)}")
+    print(f"Ended Reason: {ended_reason}")
     print(f"Transcript Snippet: {call_data.get('transcript', '')[:100]}...")
     print("------------------------------------------\n")
+
+    # Forward post-call summary to external backend
+    if EXTERNAL_BACKEND_URL and structured_data:
+        background_tasks.add_task(
+            forward_summary_task, business_id, assistant_id,
+            structured_data, summary, ended_reason
+        )
 
     return {"status": "received"}
 
@@ -821,7 +902,7 @@ async def vapi_tool_fallback(request: Request, background_tasks: BackgroundTasks
         return await handle_order(request, background_tasks)
     elif msg_type in ["end-of-call-report", "status-update", "hang-up"]:
         # Route to Summary Logic
-        return await handle_summary(request)
+        return await handle_summary(request, background_tasks)
     else:
         return {"status": "ignored", "reason": f"Unhandled message type: {msg_type}"}
 
