@@ -1,6 +1,9 @@
 import prisma from "../../../prisma/client.js";
 import { VapiLib } from "../../../lib/vapi.js";
 import { format } from "date-fns";
+import { StatusCodes } from "http-status-codes";
+import DevBuildError from "../../../lib/DevBuildError.js";
+import { PrinterService } from "../printer/printer.service.js";
 
 // Get orders for a business owner
 const getOrders = async (userId, filters = {}) => {
@@ -103,7 +106,51 @@ const getOrderById = async (userId, orderId) => {
   };
 };
 
+// Get raw receipt text without creating any print jobs or requiring registered printers
+const getOrderReceiptText = async (userId, orderId, role) => {
+  // 1. Find the order first
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      call: true,
+    },
+  });
+
+  if (!order) {
+    throw new DevBuildError("Order not found", StatusCodes.NOT_FOUND);
+  }
+
+  // 2. Find the business for this order
+  const business = await prisma.business.findUnique({
+    where: { id: order.businessId },
+    include: { owner: true, businessSettings: true },
+  });
+
+  if (!business) {
+    throw new DevBuildError("Business not found for this order", StatusCodes.NOT_FOUND);
+  }
+
+  // 3. Authorization check
+  if (role === "BUSINESS_OWNER" && business.ownerId !== userId) {
+    throw new DevBuildError("Access denied: You do not own this business", StatusCodes.FORBIDDEN);
+  }
+
+  const contactInfo = {
+    phone: business.owner?.phone || "",
+    email: business.owner?.email || "",
+  };
+
+  const rawReceiptText = PrinterService.generateReceiptText(
+    order,
+    business.businessSettings,
+    contactInfo,
+  );
+
+  return rawReceiptText;
+};
+
 export const OrderService = {
   getOrders,
   getOrderById,
+  getOrderReceiptText,
 };

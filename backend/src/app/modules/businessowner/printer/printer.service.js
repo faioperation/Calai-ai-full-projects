@@ -586,4 +586,5 @@ export const PrinterService = {
   handlePrinterPoll,
   getPrintJobContent,
   confirmPrintJob,
+  generateReceiptText,
 };
