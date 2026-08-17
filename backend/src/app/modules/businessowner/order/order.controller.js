@@ -101,8 +101,29 @@ const downloadOrderPdf = async (req, res, next) => {
   }
 };
 
+// Download order receipt (clean plain text format without creating any print jobs or requiring registered printers)
+const downloadOrderReceipt = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const role = req.user.role;
+
+    const rawReceiptText = await OrderService.getOrderReceiptText(
+      userId,
+      id,
+      role,
+    );
+
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    return res.status(StatusCodes.OK).send(rawReceiptText);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const OrderController = {
   getOrders,
   getOrderById,
   downloadOrderPdf,
+  downloadOrderReceipt,
 };

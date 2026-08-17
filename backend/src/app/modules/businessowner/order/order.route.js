@@ -22,4 +22,10 @@ router.get(
   OrderController.downloadOrderPdf,
 );
 
+router.get(
+  "/download-receipt/:id",
+  checkAuthMiddleware("BUSINESS_OWNER", "SYSTEM_OWNER"),
+  OrderController.downloadOrderReceipt,
+);
+
 export const OrderRouter = router;
