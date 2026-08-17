@@ -160,7 +160,7 @@ const ViewTenant = () => {
     try {
       const toastId = toast.loading("Downloading receipt...");
       const res = await axiosSecure.get(
-        `/business-owner/order/download/${selectedOrder.id}`,
+        `/business-owner/order/download-receipt/${selectedOrder.id}`,
         {
           responseType: "text",
         },
@@ -376,7 +376,7 @@ const ViewTenant = () => {
       render: (row) => (
         <div className="text-left text-gray-200">
           {row.created_date && row.created_date !== "N/A"
-            ? new Date(row.created_date).toLocaleDateString("en-GB")
+            ? (isNaN(new Date(row.created_date).getTime()) ? row.created_date : new Date(row.created_date).toLocaleDateString("en-GB"))
             : row.created_at
               ? new Date(row.created_at).toLocaleDateString("en-GB")
               : "N/A"}
@@ -436,7 +436,7 @@ const ViewTenant = () => {
       render: (row) => (
         <div className="text-left text-gray-200">
           {row.date && row.date !== "N/A"
-            ? new Date(row.date).toLocaleDateString("en-GB")
+            ? (isNaN(new Date(row.date).getTime()) ? row.date : new Date(row.date).toLocaleDateString("en-GB"))
             : row.created_at
               ? new Date(row.created_at).toLocaleDateString("en-GB")
               : "N/A"}
@@ -502,7 +502,7 @@ const ViewTenant = () => {
       render: (row) => (
         <div className="text-left text-gray-200">
           {row.date && row.date !== "N/A"
-            ? new Date(row.date).toLocaleDateString("en-GB")
+            ? (isNaN(new Date(row.date).getTime()) ? row.date : new Date(row.date).toLocaleDateString("en-GB"))
             : row.created_at
               ? new Date(row.created_at).toLocaleDateString("en-GB")
               : "N/A"}
