@@ -3,9 +3,9 @@ import prisma from "../../../prisma/client.js";
 import DevBuildError from "../../../lib/DevBuildError.js";
 import { syncBusinessAgentStatus } from "../../../utils/workingHoursScheduler.js";
 
-const getBusinessHourByBusinessId = async (businessId) => {
-  const business = await prisma.business.findUnique({
-    where: { id: businessId },
+const getBusinessHourByUserId = async (userId) => {
+  const business = await prisma.business.findFirst({
+    where: { ownerId: userId },
     include: { businessSettings: true },
   });
 
@@ -22,9 +22,9 @@ const getBusinessHourByBusinessId = async (businessId) => {
   };
 };
 
-const updateBusinessHour = async (businessId, data) => {
-  const business = await prisma.business.findUnique({
-    where: { id: businessId },
+const updateBusinessHour = async (userId, data) => {
+  const business = await prisma.business.findFirst({
+    where: { ownerId: userId },
   });
 
   if (!business) {
@@ -63,6 +63,6 @@ const updateBusinessHour = async (businessId, data) => {
 };
 
 export const BusinessHourService = {
-  getBusinessHourByBusinessId,
+  getBusinessHourByUserId,
   updateBusinessHour,
 };
