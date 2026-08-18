@@ -421,7 +421,6 @@ Example:
 `'{{"order_details": [{{"product_name": "Chicken Tikka Masala", "quantity": "1", "unit_prize": "9.95"}}, {{"product_name": "Pilau Rice", "quantity": "1", "unit_prize": "3.95"}}, {{"product_name": "Garlic Naan - no coriander", "quantity": "1", "unit_prize": "3.50"}}]}}'`
 
 Important:
-
 * Use the exact uploaded menu prices. NEVER guess.
 * Preserve important customer notes such as `"no garlic"`, `"no onions"` or `"sauce separate"`.
 * For a fixed-price bundle, save the accepted bundle using its configured offer price.
