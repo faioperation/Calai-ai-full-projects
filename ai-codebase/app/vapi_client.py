@@ -114,6 +114,7 @@ def create_assistant(business_id: str, system_prompt: str, business_name: str = 
                     "type": "object",
                     "properties": {
                         "customer_confirmed": {"type": "boolean"},
+                        "save_order_was_called": {"type": "boolean"},
                         "items": {
                             "type": "array",
                             "items": {
@@ -133,12 +134,12 @@ def create_assistant(business_id: str, system_prompt: str, business_name: str = 
                         "delivery_type": {"type": "string", "enum": ["pickup", "delivery"]},
                         "delivery_address": {"type": "string"}
                     },
-                    "required": ["customer_confirmed", "items", "total_price", "order_status", "customer_name", "delivery_type", "delivery_address"]
+                    "required": ["customer_confirmed", "save_order_was_called", "items", "total_price", "order_status", "customer_name", "delivery_type", "delivery_address"]
                 },
                 "messages": [
                     {
                         "role": "system",
-                        "content": "Extract the final order details for database logging.\n\n**ORDER STATUS RULES (CRITICAL)**:\n- Set order_status to 'completed' ONLY if ALL of the following are true: (1) the assistant explicitly said 'your order has been confirmed' or similar confirmation phrase, (2) the customer explicitly confirmed the order summary with 'yes', 'yeah', 'that\\'s correct' or similar, AND (3) a total price was clearly stated by the assistant. If ANY of these conditions is missing, the order is NOT completed.\n- Set order_status to 'abandoned' if: the call was disconnected or hung up before confirmation, the endedReason indicates an unexpected end (e.g. 'customer-ended-call' without confirmation, 'assistant-error', 'silence-timed-out'), or the customer cancelled the order.\n- Set order_status to 'in_progress' only if the call ended mid-conversation while items were actively being discussed but no summary was attempted.\n- Set customer_confirmed to true ONLY if the customer explicitly verbally confirmed the final order summary in the transcript. If the call ended before this confirmation, set customer_confirmed to false.\n\n**TOTAL PRICE RULES**:\n- For total_price, output the final total price clearly stated by the assistant to the customer. If no total was stated or confirmed in the transcript, set total_price to 0.\n- Do NOT guess or calculate a total that was never spoken in the conversation.\n\n**ITEM EXTRACTION**:\n- For each item in 'items', extract 'product_name', 'quantity' (as a string), and 'unit_prize' (the price of ONE unit as a decimal string, e.g. '22.09', '24.10', '5.83').\n- For unit_prize, use this priority order:\n  1. FIRST: Look for individual item prices spoken in the transcript (e.g. 'at eight pounds fifty each', 'at ten pounds'). Convert spoken prices to decimal strings (e.g. 'eight pounds fifty' = '8.50').\n  2. FALLBACK: If a specific item price was NOT spoken but the total_price and all quantities are known, calculate unit prices that sum to the stated total. Use common UK restaurant pricing (whole numbers or .50/.95/.99 endings).\n  3. NEVER output 'unknown', '0.0', or '0' for unit_prize. You MUST always provide a realistic numeric decimal string.\n\nThe delivery_type MUST be exactly 'pickup' or 'delivery'. If delivery_type is 'delivery', extract the 'delivery_address' from the transcript. If it's 'pickup', set 'delivery_address' to 'N/A' or an empty string.\n\nJson Schema:\n{{schema}}\n\nOnly respond with the JSON."
+                        "content": "Extract the final order details for database logging.\n\n**ORDER STATUS RULES (CRITICAL)**:\n- Set order_status to 'completed' ONLY if ALL of the following are true: (1) the assistant read the full order summary aloud to the customer, (2) the assistant asked 'Is that all correct?' or similar, (3) the customer explicitly confirmed the order summary with 'yes', 'yeah', 'that\\'s correct' or similar affirmative response, (4) the assistant said 'your order has been confirmed' or similar confirmation phrase, AND (5) a total price was clearly stated by the assistant. If ANY of these conditions is missing, the order is NOT completed.\n- Set order_status to 'abandoned' if: the call was disconnected or hung up before the customer confirmed the summary, the endedReason indicates an unexpected end (e.g. 'customer-ended-call' without confirmation, 'assistant-error', 'silence-timed-out'), the customer cancelled the order, the customer said 'no' to the order summary and never re-confirmed, or save_order was never successfully called.\n- Set order_status to 'in_progress' only if the call ended mid-conversation while items were actively being discussed but no summary was attempted.\n- Set customer_confirmed to true ONLY if the customer explicitly verbally confirmed the final order summary in the transcript with a clear 'yes', 'yeah', 'correct', 'that\\'s right' or similar. Simply saying 'that\\'s it' (meaning done adding items) does NOT count as confirming the summary. If the call ended before this confirmation, set customer_confirmed to false.\n- Set save_order_was_called to true ONLY if the transcript shows save_order was successfully invoked and the assistant confirmed the order. If save_order was never called, or was rejected by the backend, set it to false.\n\n**TOTAL PRICE RULES**:\n- For total_price, output the final total price clearly stated by the assistant to the customer. If no total was stated or confirmed in the transcript, set total_price to 0.\n- Do NOT guess or calculate a total that was never spoken in the conversation.\n\n**ITEM EXTRACTION**:\n- For each item in 'items', extract 'product_name', 'quantity' (as a string), and 'unit_prize' (the price of ONE unit as a decimal string, e.g. '22.09', '24.10', '5.83').\n- For unit_prize, use this priority order:\n  1. FIRST: Look for individual item prices spoken in the transcript (e.g. 'at eight pounds fifty each', 'at ten pounds'). Convert spoken prices to decimal strings (e.g. 'eight pounds fifty' = '8.50').\n  2. FALLBACK: If a specific item price was NOT spoken but the total_price and all quantities are known, calculate unit prices that sum to the stated total. Use common UK restaurant pricing (whole numbers or .50/.95/.99 endings).\n  3. NEVER output 'unknown', '0.0', or '0' for unit_prize. You MUST always provide a realistic numeric decimal string.\n\nThe delivery_type MUST be exactly 'pickup' or 'delivery'. If delivery_type is 'delivery', extract the 'delivery_address' from the transcript. If it's 'pickup', set 'delivery_address' to 'N/A' or an empty string.\n\nJson Schema:\n{{schema}}\n\nOnly respond with the JSON."
                     },
                     {
                         "role": "user",
@@ -191,13 +192,21 @@ def create_assistant(business_id: str, system_prompt: str, business_name: str = 
                 },
                 "function": {
                     "name": "save_order",
-                    "description": "Saves the completed order ONLY after explicit verbal confirmation from the customer. Requires customer_confirmed=true.",
+                    "description": "FINAL step: saves a COMPLETED order to the kitchen. ONLY call this function AFTER: (1) you have read the full order summary to the customer including all items, quantities and total price, (2) you asked 'Is that all correct?', (3) the customer responded with an explicit 'yes', 'yeah', 'correct', 'that is right', 'sure', or 'go ahead' confirming the summary, and (4) for delivery orders, the payment method has been confirmed as cash or card. If the customer said 'no', cancelled, hung up, or has not yet confirmed, DO NOT call this function. Calling this without genuine customer confirmation will result in an error and the order will be rejected.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "customer_confirmed": {
                                 "type": "boolean",
-                                "description": "MUST be true. Explicit verbal confirmation received from customer for order summary and payment method."
+                                "description": "MUST be true. Set to true ONLY when the customer has explicitly said 'yes', 'yeah', 'correct' or similar in response to the order summary. If the customer has NOT confirmed, do NOT call this function."
+                            },
+                            "confirmation_phrase": {
+                                "type": "string",
+                                "description": "The EXACT words the customer used to confirm the order summary (e.g., 'yes', 'yeah that's correct', 'yes please', 'go ahead'). This MUST be the customer's actual spoken words. If you cannot provide the customer's real confirmation words, do NOT call this function."
+                            },
+                            "order_summary_read": {
+                                "type": "boolean",
+                                "description": "MUST be true. Confirms that you read the complete order summary (all items, quantities, total price) aloud to the customer and asked 'Is that all correct?' before calling this function."
                             },
                             "customer_name": {"type": "string"},
                             "customer_email": {"type": "string"},
@@ -208,7 +217,7 @@ def create_assistant(business_id: str, system_prompt: str, business_name: str = 
                             "delivery_address": {"type": "string"},
                             "customer_phone": {"type": "string"}
                         },
-                        "required": ["customer_confirmed", "order_items", "total_price"]
+                        "required": ["customer_confirmed", "confirmation_phrase", "order_summary_read", "order_items", "total_price"]
                     }
                 }
             }
