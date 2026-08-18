@@ -418,7 +418,7 @@ Each object MUST contain:
 If a Special Offer is accepted, record it clearly.
 
 Example:
-`'{"order_details": [{"product_name": "Chicken Tikka Masala", "quantity": "1", "unit_prize": "9.95"}, {"product_name": "Pilau Rice", "quantity": "1", "unit_prize": "3.95"}, {"product_name": "Garlic Naan - no coriander", "quantity": "1", "unit_prize": "3.50"}]}'`
+`'{{"order_details": [{{"product_name": "Chicken Tikka Masala", "quantity": "1", "unit_prize": "9.95"}}, {{"product_name": "Pilau Rice", "quantity": "1", "unit_prize": "3.95"}}, {{"product_name": "Garlic Naan - no coriander", "quantity": "1", "unit_prize": "3.50"}}]}}'`
 
 Important:
 
