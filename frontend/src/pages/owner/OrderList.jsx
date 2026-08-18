@@ -47,7 +47,7 @@ const OrderList = () => {
     try {
       const toastId = toast.loading("Downloading receipt...");
       const res = await axiosSecure.get(
-        `/business-owner/order/download/${selectedOrder.id}`,
+        `/business-owner/order/download-receipt/${selectedOrder.id}`,
         {
           responseType: "text",
         },
