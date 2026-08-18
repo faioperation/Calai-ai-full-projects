@@ -43,6 +43,61 @@ def is_customer_confirmed(val) -> bool:
         return True
     return False
 
+def validate_order_confirmation(args: dict) -> tuple:
+    """
+    Multi-gate validation for order confirmation.
+    Returns (is_valid: bool, rejection_reason: str).
+    ALL gates must pass for the order to be accepted.
+    Uses soft allowlist: rejects phrases with negative words, accepts everything else.
+    """
+    # Gate 1: customer_confirmed must be explicitly true
+    if not is_customer_confirmed(args.get("customer_confirmed")):
+        return False, "customer_confirmed is not true — customer has not confirmed the order"
+
+    # Gate 2: confirmation_phrase must be present and not contain negative/cancellation words
+    phrase = (args.get("confirmation_phrase") or "").strip().lower()
+    if not phrase:
+        return False, "confirmation_phrase is empty — no customer confirmation words provided. You must include the customer's exact spoken confirmation words."
+
+    # Soft allowlist: reject if the phrase contains negative/cancellation indicators
+    # (unless it also contains a positive like 'yes' — e.g. 'yes, no changes needed')
+    negative_indicators = [
+        "no", "cancel", "don't", "dont", "stop", "wait",
+        "hold on", "not yet", "never mind", "nevermind",
+        "forget it", "forget", "changed my mind", "hang up"
+    ]
+    positive_indicators = [
+        "yes", "yeah", "yep", "yup", "correct", "right",
+        "sure", "go ahead", "please", "fine", "okay", "ok"
+    ]
+    has_positive = any(pos in phrase for pos in positive_indicators)
+    for neg in negative_indicators:
+        if neg in phrase and not has_positive:
+            return False, f"confirmation_phrase contains negative indicator '{neg}' without any positive confirmation — customer may not have confirmed"
+
+    # Gate 3: order_summary_read must be true
+    order_summary_read = args.get("order_summary_read")
+    if order_summary_read is not True:
+        if isinstance(order_summary_read, str) and order_summary_read.strip().lower() in ["true", "1", "yes"]:
+            pass  # Accept string "true"
+        else:
+            return False, "order_summary_read is not true — the order summary must be read aloud to the customer before saving"
+
+    # Gate 4: order_items must not be empty
+    order_items = args.get("order_items")
+    if not order_items or (isinstance(order_items, str) and not order_items.strip()):
+        return False, "order_items is empty — there are no items in the order"
+
+    # Gate 5: total_price must be > 0
+    try:
+        total = float(args.get("total_price", 0) or 0)
+        if total <= 0:
+            return False, f"total_price is {total} — a valid order must have a positive total"
+    except (ValueError, TypeError):
+        return False, "total_price is not a valid number"
+
+    return True, "all gates passed"
+
 def normalize_list(items, total_price=None) -> list:
     normalized = []
     if not isinstance(items, list):
@@ -685,15 +740,23 @@ def forward_summary_task(business_id: str, assistant_id: str,
         # Determine order status from structured data
         order_status = structured_data.get("order_status", "abandoned")
         customer_confirmed = structured_data.get("customer_confirmed", False)
+        save_order_was_called = structured_data.get("save_order_was_called", False)
 
         # Safety: if customer didn't confirm, force status to abandoned
         if not customer_confirmed and order_status == "completed":
             order_status = "abandoned"
+            print(f"⚠️ SAFETY NET for {business_id}: Post-call analysis says 'completed' but customer_confirmed=false. Forcing to 'abandoned'.")
+
+        # Safety: if save_order was never called, force status to abandoned
+        if not save_order_was_called and order_status == "completed":
+            order_status = "abandoned"
+            print(f"⚠️ SAFETY NET for {business_id}: Post-call analysis says 'completed' but save_order was never called. Forcing to 'abandoned'.")
 
         # Safety: if total is 0/None and status is completed, mark as abandoned
         total_price = structured_data.get("total_price", 0)
         if (total_price is None or total_price == 0) and order_status == "completed":
             order_status = "abandoned"
+            print(f"⚠️ SAFETY NET for {business_id}: Post-call analysis says 'completed' but total_price is {total_price}. Forcing to 'abandoned'.")
 
         summary_payload = {
             "type": "call_summary",
@@ -701,6 +764,7 @@ def forward_summary_task(business_id: str, assistant_id: str,
             "business_id": business_id,
             "order_status": order_status,
             "customer_confirmed": customer_confirmed,
+            "save_order_was_called": save_order_was_called,
             "customer_name": structured_data.get("customer_name", ""),
             "items": structured_data.get("items", []),
             "total_price": total_price,
@@ -735,24 +799,24 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
         business_id = "Dashboard Tool"
         assistant_id = "Unknown"
 
-        # HARD CONFIRMATION GATE CHECK
-        if not is_customer_confirmed(args.get("customer_confirmed")):
-            print("❌ ORDER REJECTED: Hard confirmation gate failed (customer_confirmed is not True).")
+        # MULTI-GATE CONFIRMATION VALIDATION
+        is_valid, rejection_reason = validate_order_confirmation(args)
+        if not is_valid:
+            print(f"❌ ORDER REJECTED for {business_id}: {rejection_reason}")
+            print(f"   Args: customer_confirmed={args.get('customer_confirmed')}, "
+                  f"confirmation_phrase='{args.get('confirmation_phrase')}', "
+                  f"order_summary_read={args.get('order_summary_read')}, "
+                  f"total_price={args.get('total_price')}")
             return {
                 "status": "error",
-                "message": "Order rejected: save_order requires customer_confirmed=true. Explicit verbal confirmation from the customer is mandatory before calling save_order."
+                "result": f"ORDER REJECTED: {rejection_reason}. "
+                          f"You MUST: (1) read the complete order summary to the customer, "
+                          f"(2) ask 'Is that all correct?', "
+                          f"(3) wait for the customer to say 'yes' or similar, "
+                          f"(4) only THEN call save_order with customer_confirmed=true, "
+                          f"confirmation_phrase set to the customer's exact words, "
+                          f"and order_summary_read=true."
             }
-
-        # TOTAL PRICE SANITY CHECK
-        total_price = args.get("total_price")
-        try:
-            total_price_float = float(total_price) if total_price is not None else 0.0
-        except (ValueError, TypeError):
-            total_price_float = 0.0
-
-        if total_price_float <= 0:
-            print(f"⚠️ ORDER WARNING for {business_id}: total_price is £{total_price}. Order will be forwarded but flagged.")
-            args["_warning"] = "total_price_zero_or_missing"
 
         import json
         formatted_details = parse_and_format_order_details(args.get("order_items"), args.get("total_price"))
@@ -760,6 +824,8 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
         print(f"Customer: {args.get('customer_name')}")
         print(f"Email: {args.get('customer_email')}")
         print(f"Customer Confirmed: {args.get('customer_confirmed')}")
+        print(f"Confirmation Phrase: '{args.get('confirmation_phrase')}'")
+        print(f"Order Summary Read: {args.get('order_summary_read')}")
         print(f"Items (Raw): {args.get('order_items')}")
         print(f"Items (Structured JSON): {json.dumps({'order_details': formatted_details}, indent=2)}")
         print(f"Total: £{args.get('total_price')}")
@@ -802,34 +868,36 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
                     args = {}
             business_id = message.get("customer", {}).get("metadata", {}).get("business_id", "Unknown")
 
-            # HARD CONFIRMATION GATE CHECK
-            if not is_customer_confirmed(args.get("customer_confirmed")):
-                print(f"❌ ORDER REJECTED for {business_id}: Hard confirmation gate failed (customer_confirmed is not True).")
+            # MULTI-GATE CONFIRMATION VALIDATION
+            is_valid, rejection_reason = validate_order_confirmation(args)
+            if not is_valid:
+                print(f"❌ ORDER REJECTED for {business_id}: {rejection_reason}")
+                print(f"   Args: customer_confirmed={args.get('customer_confirmed')}, "
+                      f"confirmation_phrase='{args.get('confirmation_phrase')}', "
+                      f"order_summary_read={args.get('order_summary_read')}, "
+                      f"total_price={args.get('total_price')}")
                 results.append({
                     "toolCallId": tool_call.get("id"),
-                    "result": "ERROR: Order rejected by backend. save_order requires customer_confirmed=true. Explicit verbal confirmation of the final summary and payment method MUST be received before invoking save_order."
+                    "result": f"ERROR: Order rejected by backend. {rejection_reason}. "
+                              f"You MUST: (1) read the complete order summary to the customer, "
+                              f"(2) ask 'Is that all correct?', "
+                              f"(3) wait for the customer to say 'yes' or similar, "
+                              f"(4) only THEN call save_order with customer_confirmed=true, "
+                              f"confirmation_phrase set to the customer's exact words, "
+                              f"and order_summary_read=true."
                 })
                 continue
 
             import json
             formatted_details = parse_and_format_order_details(args.get("order_items"), args.get("total_price"))
 
-            # TOTAL PRICE SANITY CHECK
-            total_price = args.get("total_price")
-            try:
-                total_price_float = float(total_price) if total_price is not None else 0.0
-            except (ValueError, TypeError):
-                total_price_float = 0.0
-
-            if total_price_float <= 0:
-                print(f"⚠️ ORDER WARNING for {business_id}: total_price is £{total_price}. Order will be forwarded but flagged.")
-                args["_warning"] = "total_price_zero_or_missing"
-
             print(f"\n--- 🍕 NEW ORDER RECEIVED for {business_id} ---")
             print(f"Assistant ID: {assistant_id}")
             print(f"Customer: {args.get('customer_name')}")
             print(f"Email: {args.get('customer_email')}")
             print(f"Customer Confirmed: {args.get('customer_confirmed')}")
+            print(f"Confirmation Phrase: '{args.get('confirmation_phrase')}'")
+            print(f"Order Summary Read: {args.get('order_summary_read')}")
             print(f"Items (Raw): {args.get('order_items')}")
             print(f"Items (Structured JSON): {json.dumps({'order_details': formatted_details}, indent=2)}")
             print(f"Total: £{args.get('total_price')}")
