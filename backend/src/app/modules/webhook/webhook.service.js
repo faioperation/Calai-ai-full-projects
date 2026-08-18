@@ -125,6 +125,202 @@ Calai`;
 };
 
 /**
+ * 5-Gate Validation for Order Confirmation
+ * Ensures an order is NEVER saved if:
+ * 1. order_status is "abandoned", "cancelled", "rejected", "failed", etc.
+ * 2. customer_confirmed is explicitly false
+ * 3. save_order_was_called is explicitly false
+ * 4. order_summary_read is explicitly false
+ * 5. confirmation_phrase indicates cancellation/rejection
+ * 6. items array is empty
+ * 7. total_price is <= 0
+ */
+const NEGATIVE_CONFIRMATION_WORDS = [
+  "cancel",
+  "cancle",
+  "forget",
+  "nevermind",
+  "never mind",
+  "dont want",
+  "don't want",
+  "do not want",
+  "stop",
+  "abort",
+  "wrong",
+  "not now",
+  "changed my mind",
+  "no thanks",
+];
+
+const POSITIVE_CONFIRMATION_WORDS = [
+  "yes",
+  "yeah",
+  "yep",
+  "yup",
+  "sure",
+  "correct",
+  "right",
+  "confirm",
+  "confirmed",
+  "perfect",
+  "good",
+  "great",
+  "go ahead",
+  "sounds good",
+  "all good",
+  "that's right",
+  "thats right",
+  "that is right",
+  "that's correct",
+  "thats correct",
+  "please",
+  "ok",
+  "okay",
+  "fine",
+  "proceed",
+];
+
+const validateOrderConfirmation = (data, context = "general") => {
+  if (!data || typeof data !== "object") {
+    return { isValid: false, reason: "No order data provided." };
+  }
+
+  // Gate 1: Check order_status
+  const rawStatus = data.order_status || data.orderStatus || data.status;
+  if (rawStatus && typeof rawStatus === "string") {
+    const normalizedStatus = rawStatus.toLowerCase().trim();
+    const cancelledStatuses = [
+      "abandoned",
+      "cancelled",
+      "canceled",
+      "rejected",
+      "failed",
+      "incomplete",
+      "not_completed",
+      "cancel",
+      "cancle",
+    ];
+    if (cancelledStatuses.includes(normalizedStatus)) {
+      return {
+        isValid: false,
+        reason: `Order status is marked as "${normalizedStatus}" (customer cancelled or abandoned).`,
+      };
+    }
+  }
+
+  // Gate 2: Check customer_confirmed flag
+  const customerConfirmed =
+    data.customer_confirmed ?? data.customerConfirmed;
+  if (customerConfirmed !== undefined) {
+    const isConfirmed =
+      customerConfirmed === true ||
+      customerConfirmed === "true" ||
+      customerConfirmed === 1;
+    if (!isConfirmed) {
+      return {
+        isValid: false,
+        reason:
+          "Customer has not explicitly confirmed the order (customer_confirmed is false).",
+      };
+    }
+  }
+
+  // Gate 3: Check save_order_was_called flag (used in post-call analysis)
+  const saveOrderWasCalled =
+    data.save_order_was_called ?? data.saveOrderWasCalled;
+  if (saveOrderWasCalled !== undefined) {
+    const wasCalled =
+      saveOrderWasCalled === true ||
+      saveOrderWasCalled === "true" ||
+      saveOrderWasCalled === 1;
+    if (!wasCalled) {
+      return {
+        isValid: false,
+        reason:
+          "The save_order tool was not called during the call (save_order_was_called is false).",
+      };
+    }
+  }
+
+  // Gate 4: Check order_summary_read flag (if passed by LLM in tool calls)
+  const orderSummaryRead =
+    data.order_summary_read ?? data.orderSummaryRead;
+  if (orderSummaryRead !== undefined) {
+    const wasRead =
+      orderSummaryRead === true ||
+      orderSummaryRead === "true" ||
+      orderSummaryRead === 1;
+    if (!wasRead) {
+      return {
+        isValid: false,
+        reason:
+          "Order summary was not read aloud to the customer before calling save_order.",
+      };
+    }
+  }
+
+  // Gate 5: Check confirmation_phrase (soft allowlist / negative filter)
+  const confirmationPhrase =
+    data.confirmation_phrase || data.confirmationPhrase;
+  if (typeof confirmationPhrase === "string") {
+    const phrase = confirmationPhrase.toLowerCase().trim();
+    if (context === "tool_call" && phrase.length === 0) {
+      return {
+        isValid: false,
+        reason:
+          "Confirmation phrase is empty. Explicit customer confirmation statement is required.",
+      };
+    }
+
+    if (phrase.length > 0) {
+      const hasNegative = NEGATIVE_CONFIRMATION_WORDS.some((word) =>
+        phrase.includes(word),
+      );
+      const hasPositive = POSITIVE_CONFIRMATION_WORDS.some((word) =>
+        phrase.includes(word),
+      );
+
+      // If phrase has negative words and no positive affirmation (e.g. "no cancel it", "forget it")
+      if (hasNegative && !hasPositive) {
+        return {
+          isValid: false,
+          reason: `Confirmation phrase "${confirmationPhrase}" indicates order cancellation or refusal.`,
+        };
+      }
+    }
+  }
+
+  // Gate 6: Check order items list
+  let itemsList = data.final_items || data.order_items || data.items || [];
+  if (typeof itemsList === "string") {
+    try {
+      itemsList = JSON.parse(itemsList);
+    } catch {
+      itemsList = [];
+    }
+  }
+  if (!Array.isArray(itemsList) || itemsList.length === 0) {
+    return {
+      isValid: false,
+      reason: "Order contains no items.",
+    };
+  }
+
+  // Gate 7: Check total price
+  const totalPrice = Number(
+    data.total_price || data.totalPrice || data.total || 0,
+  );
+  if (isNaN(totalPrice) || totalPrice <= 0) {
+    return {
+      isValid: false,
+      reason: `Order total price must be greater than 0 (received £${totalPrice}).`,
+    };
+  }
+
+  return { isValid: true };
+};
+
+/**
  * Helper to promote and merge a recent temporary direct call into a real Vapi Call ID.
  * This prevents duplicate entries when custom tools create temporary IDs.
  */
@@ -261,6 +457,17 @@ const processVapiWebhook = async (payload) => {
     !message &&
     (payload.order_items || payload.items || payload.final_items)
   ) {
+    const validation = validateOrderConfirmation(payload, "direct_order");
+    if (!validation.isValid) {
+      console.log(
+        `ℹ️ [Direct-Order] Order creation rejected: ${validation.reason}`,
+      );
+      return {
+        success: false,
+        message: `Order rejected: ${validation.reason}`,
+      };
+    }
+
     const assistantId =
       payload.assistantId ||
       payload.vapiAgentId ||
@@ -517,6 +724,25 @@ const processVapiWebhook = async (payload) => {
       );
 
       if (funcName.toLowerCase().includes("order")) {
+        const validation = validateOrderConfirmation(args, "tool_call");
+
+        if (!validation.isValid) {
+          console.warn(
+            `⚠️ Tool Call [${funcName}] Order Confirmation Gate Rejected: ${validation.reason}`,
+          );
+          results.push({
+            toolCallId: toolCall.id,
+            result: {
+              success: false,
+              error: "ORDER_NOT_CONFIRMED",
+              message: validation.reason,
+              instruction:
+                "Do not call save_order until you have read the full order summary aloud and received clear, explicit confirmation from the customer.",
+            },
+          });
+          continue;
+        }
+
         const orderItems =
           args.final_items || args.order_items || args.items || [];
         const totalPrice = Number(
@@ -530,8 +756,10 @@ const processVapiWebhook = async (payload) => {
         const customerEmail =
           args.customer_email || args.customerEmail || args.email || "N/A";
 
-        const { orderType, deliveryAddress: parsedAddress, pickupTime } = parseOrderTypeAndAddress(args, call?.startTime);
-        const deliveryAddress = parsedAddress || vapiCall?.customer?.address || null;
+        const { orderType, deliveryAddress: parsedAddress, pickupTime } =
+          parseOrderTypeAndAddress(args, call?.startTime);
+        const deliveryAddress =
+          parsedAddress || vapiCall?.customer?.address || null;
 
         if (call) {
           const orderRecord = await prisma.order.upsert({
@@ -560,7 +788,7 @@ const processVapiWebhook = async (payload) => {
           console.log(
             `✅ Order synced successfully in tool call! Total: £${totalPrice}`,
           );
-          
+
           await PrinterService.autoQueueOrderPrint(businessId, orderRecord.id);
           await notifyNewOrder(orderRecord.id);
           sendOrderConfirmationEmail(businessId, orderRecord);
@@ -720,34 +948,61 @@ const processVapiWebhook = async (payload) => {
   // 3. Sync Order (If structured data exists)
   const structuredData = analysis?.structuredData;
   if (structuredData) {
-    // Handle variations in field names from Vapi schemas
-    const orderItems =
-      structuredData.final_items ||
-      structuredData.order_items ||
-      structuredData.items ||
-      [];
-    const totalPrice = Number(
-      structuredData.total_price ||
-        structuredData.totalPrice ||
-        structuredData.total ||
-        0,
-    );
-    const customerName =
-      structuredData.customer_name ||
-      structuredData.customerName ||
-      vapiCall.customer?.name ||
-      "N/A";
-    const customerEmail =
-      structuredData.customer_email ||
-      structuredData.customerEmail ||
-      structuredData.email ||
-      "N/A";
+    const validation = validateOrderConfirmation(structuredData, "end_of_call");
 
-    const { orderType, deliveryAddress: parsedAddress, pickupTime } = parseOrderTypeAndAddress(structuredData, call.startTime);
-    const deliveryAddress = parsedAddress || vapiCall?.customer?.address || null;
+    if (!validation.isValid) {
+      console.log(
+        `ℹ️ [End-of-Call] Order sync skipped for call ${call.id}: ${validation.reason}`,
+      );
 
-    // Only create order if there are items or a price
-    if (orderItems.length > 0 || totalPrice > 0) {
+      // Safety Net: If an order was previously created during the call but the call ended in abandonment/cancellation, clean it up
+      const existingOrder = await prisma.order.findUnique({
+        where: { callId: call.id },
+      });
+
+      if (existingOrder) {
+        console.log(
+          `🧹 [End-of-Call] Cleaning up cancelled/abandoned order (ID: ${existingOrder.id}) for call ${call.id}`,
+        );
+        await prisma.printJob.deleteMany({
+          where: { orderId: existingOrder.id, status: "pending" },
+        });
+        await prisma.orderItem.deleteMany({
+          where: { orderId: existingOrder.id },
+        });
+        await prisma.order.delete({
+          where: { id: existingOrder.id },
+        });
+      }
+    } else {
+      // Handle variations in field names from Vapi schemas
+      const orderItems =
+        structuredData.final_items ||
+        structuredData.order_items ||
+        structuredData.items ||
+        [];
+      const totalPrice = Number(
+        structuredData.total_price ||
+          structuredData.totalPrice ||
+          structuredData.total ||
+          0,
+      );
+      const customerName =
+        structuredData.customer_name ||
+        structuredData.customerName ||
+        vapiCall.customer?.name ||
+        "N/A";
+      const customerEmail =
+        structuredData.customer_email ||
+        structuredData.customerEmail ||
+        structuredData.email ||
+        "N/A";
+
+      const { orderType, deliveryAddress: parsedAddress, pickupTime } =
+        parseOrderTypeAndAddress(structuredData, call.startTime);
+      const deliveryAddress =
+        parsedAddress || vapiCall?.customer?.address || null;
+
       const orderRecord = await prisma.order.upsert({
         where: { callId: call.id },
         update: {
@@ -772,6 +1027,9 @@ const processVapiWebhook = async (payload) => {
         },
       });
 
+      console.log(
+        `✅ [End-of-Call] Order confirmed and saved! Total: £${totalPrice}`,
+      );
       await PrinterService.autoQueueOrderPrint(businessId, orderRecord.id);
       await notifyNewOrder(orderRecord.id);
       sendOrderConfirmationEmail(businessId, orderRecord);
