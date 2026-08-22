@@ -114,8 +114,8 @@ const Dashboard = () => {
     },
     {
       title: "Monthly Revenue",
-      value: `$${stats?.monthlyRevenue?.value ?? 0}`,
-      icon: "lucide:dollar-sign",
+      value: `£${stats?.monthlyRevenue?.value ?? 0}`,
+      icon: "lucide:pound-sterling",
       iconBg: "bg-transparent",
       trend: stats?.monthlyRevenue?.change ?? "0%",
       trendText: stats?.monthlyRevenue?.subtext ?? "",
