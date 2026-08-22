@@ -302,7 +302,7 @@ const generateReceiptText = (order, businessSettings, contactInfo) => {
     const itemTotal = parseFloat(item.total_price || qty * unitPrice);
 
     const leftText = `${qty}x ${name}`;
-    const rightText = `${curr}${itemTotal.toFixed(2)}`;
+    const rightText = `${curr} ${itemTotal.toFixed(2)}`;
 
     if (leftText.length + rightText.length >= width) {
       lines.push(leftText.substring(0, width));
@@ -315,8 +315,8 @@ const generateReceiptText = (order, businessSettings, contactInfo) => {
 
   // Totals
   const total = parseFloat(order.totalPrice || 0);
-  lines.push(formatTwoColumns("Subtotal:", `${curr}${total.toFixed(2)}`));
-  lines.push(formatTwoColumns("TOTAL:", `${curr}${total.toFixed(2)}`));
+  lines.push(formatTwoColumns("Subtotal:", `${curr} ${total.toFixed(2)}`));
+  lines.push(formatTwoColumns("TOTAL:", `${curr} ${total.toFixed(2)}`));
   lines.push(dashedLine);
 
   lines.push(center("Thank you for your order!"));
