@@ -69,7 +69,7 @@ const AgentList = () => {
                         <div className="w-8 h-8 rounded-lg bg-[#1A1A1A] flex items-center justify-center mr-3 border border-white/5">
                             <Phone className="w-4 h-4 text-gray-500" />
                         </div>
-                        <span className="text-gray-400">Twilio No</span>
+                        <span className="text-gray-400">Agent Number</span>
                     </div>
                     <span className="text-gray-200 font-medium">{agent.twilioNumber || 'N/A'}</span>
                   </div>
@@ -79,7 +79,7 @@ const AgentList = () => {
                         <div className="w-8 h-8 rounded-lg bg-[#1A1A1A] flex items-center justify-center mr-3 border border-white/5">
                             <Phone className="w-4 h-4 text-gray-500" />
                         </div>
-                        <span className="text-gray-400">Manager No</span>
+                        <span className="text-gray-400">Manager Number</span>
                     </div>
                     <span className="text-gray-200 font-medium">{agent.managerNumber || 'N/A'}</span>
                   </div>
