@@ -168,7 +168,7 @@ const OrderList = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-white">
           <div className="bg-[#111111] border border-[#1A1A1A] rounded-[20px] w-full max-w-[700px] overflow-hidden relative shadow-2xl">
             {/* Header */}
-            <div className="px-8 py-6 border-b border-[#1A1A1A] flex justify-between items-center">
+            <div className="px-4 sm:px-8 py-4 sm:py-6 border-b border-[#1A1A1A] flex justify-between items-center">
               <h2 className="text-[17px] text-gray-200">
                 Order Summary{" "}
                 {selectedOrder && (
@@ -192,7 +192,7 @@ const OrderList = () => {
             ) : (
               <>
                 {/* Table Content */}
-                <div className="px-8 py-2 max-h-[400px] overflow-y-auto">
+                <div className="px-4 sm:px-8 py-2 max-h-[400px] overflow-y-auto overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b border-[#1A1A1A]">
@@ -201,9 +201,6 @@ const OrderList = () => {
                         </th>
                         <th className="py-4 text-[14px] font-semibold text-white text-center">
                           Order Quantity
-                        </th>
-                        <th className="py-4 text-[14px] font-semibold text-white">
-                          Time
                         </th>
                         <th className="py-4 text-[14px] font-semibold text-white text-right">
                           Price
@@ -225,9 +222,6 @@ const OrderList = () => {
                                 {product.quantity}
                               </span>
                             </td>
-                            <td className="py-5 text-[14px] text-gray-300">
-                              {selectedOrder?.time || "-"}
-                            </td>
                             <td className="py-5 text-[14px] text-gray-300 text-right">
                               £{product.unit_prize || 0}
                             </td>
@@ -248,24 +242,24 @@ const OrderList = () => {
                 </div>
 
                 {/* Footer Actions */}
-                <div className="px-8 py-6 flex justify-between items-center mt-2 border-t border-[#1A1A1A]">
-                  <div className="text-[15px] font-medium text-white">
+                <div className="px-4 sm:px-8 py-4 sm:py-6 flex flex-col sm:flex-row justify-between items-center gap-4 mt-2 border-t border-[#1A1A1A]">
+                  <div className="text-[15px] font-medium text-white w-full sm:w-auto text-center sm:text-left">
                     Total:{" "}
                     <span className="text-[#2563EB]">
                       £{selectedOrder?.totalPrice || 0}
                     </span>
                   </div>
-                  <div className="flex gap-4">
+                  <div className="flex gap-3 sm:gap-4 w-full sm:w-auto justify-between sm:justify-start">
                     <button
                       onClick={handlePrint}
-                      className="flex items-center gap-2 bg-[#1A2255] hover:bg-[#232D70] transition-colors text-white px-6 py-2.5 rounded-[10px] text-[13px] font-medium cursor-pointer"
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[#1A2255] hover:bg-[#232D70] transition-colors text-white px-4 sm:px-6 py-2.5 rounded-[10px] text-[13px] font-medium cursor-pointer"
                     >
                       <Printer className="w-4 h-4" />
                       Print
                     </button>
                     <button
                       onClick={handleDownload}
-                      className="flex items-center gap-2 bg-[#1A2255] hover:bg-[#232D70] transition-colors text-white px-6 py-2.5 rounded-[10px] text-[13px] font-medium cursor-pointer"
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[#1A2255] hover:bg-[#232D70] transition-colors text-white px-4 sm:px-6 py-2.5 rounded-[10px] text-[13px] font-medium cursor-pointer"
                     >
                       <Download className="w-4 h-4" />
                       Download

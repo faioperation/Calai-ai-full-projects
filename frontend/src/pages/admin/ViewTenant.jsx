@@ -305,7 +305,10 @@ const ViewTenant = () => {
       width: "20%",
       sortable: true,
       render: (row) => (
-        <div className="text-left text-gray-200">
+        <div 
+          className="text-left text-gray-200 truncate pr-4" 
+          title={row.invoice_no || row.invoice || "N/A"}
+        >
           {row.invoice_no || row.invoice || "N/A"}
         </div>
       ),
@@ -449,7 +452,7 @@ const ViewTenant = () => {
       width: "20%",
       sortable: false,
       render: (row) => (
-        <div className="relative w-[180px]">
+        <div className="relative w-[145px] sm:w-[160px]">
           <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
             <FileText className="w-4 h-4 text-white" />
           </div>
@@ -470,7 +473,7 @@ const ViewTenant = () => {
     {
       key: "callId",
       Title: "Number",
-      width: "25%",
+      width: "15%",
       render: (row) => (
         <div className="text-left text-gray-200">
           {row.number || row.id || "N/A"}
@@ -480,7 +483,7 @@ const ViewTenant = () => {
     {
       key: "customerName",
       Title: "Customer Name",
-      width: "20%",
+      width: "15%",
       render: (row) => (
         <div className="text-left text-gray-200">
           {row.customerName || "N/A"}
@@ -490,7 +493,7 @@ const ViewTenant = () => {
     {
       key: "time",
       Title: "Time",
-      width: "15%",
+      width: "10%",
       render: (row) => (
         <div className="text-left text-gray-200">{row.time || "N/A"}</div>
       ),
@@ -498,7 +501,7 @@ const ViewTenant = () => {
     {
       key: "date",
       Title: "Date",
-      width: "15%",
+      width: "10%",
       render: (row) => (
         <div className="text-left text-gray-200">
           {row.date && row.date !== "N/A"
@@ -510,9 +513,19 @@ const ViewTenant = () => {
       ),
     },
     {
+      key: "orderType",
+      Title: "Order Type",
+      width: "10%",
+      render: (row) => (
+        <div className="text-left text-gray-200">
+          {row.orderType || "N/A"}
+        </div>
+      ),
+    },
+    {
       key: "totalPrice",
       Title: "Amount",
-      width: "15%",
+      width: "10%",
       render: (row) => (
         <div className="text-left text-gray-200">
           £{row.totalPrice || row.amount || 0}
@@ -522,7 +535,7 @@ const ViewTenant = () => {
     {
       key: "action",
       Title: "Action",
-      width: "10%",
+      width: "8%",
       sortable: false,
       render: (row) => (
         <div className="flex justify-start">
@@ -656,28 +669,28 @@ const ViewTenant = () => {
 
       {/* Tabs Section */}
       <div className="bg-[#191919] rounded-2xl border border-gray-800/50 overflow-visible w-full">
-        <div className="flex border-b border-gray-800/50">
+        <div className="flex border-b border-gray-800/50 overflow-x-auto scrollbar-hide">
           <button
             onClick={() => setActiveTab("agents")}
-            className={`px-6 py-4 text-sm font-medium transition-colors ${activeTab === "agents" ? "text-white border-b-2 border-[#4285F4]" : "text-gray-400 hover:text-gray-200"}`}
+            className={`px-4 sm:px-6 py-4 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === "agents" ? "text-white border-b-2 border-[#4285F4]" : "text-gray-400 hover:text-gray-200"}`}
           >
             AI Agents
           </button>
           <button
             onClick={() => setActiveTab("calls")}
-            className={`px-6 py-4 text-sm font-medium transition-colors ${activeTab === "calls" ? "text-white border-b-2 border-[#4285F4]" : "text-gray-400 hover:text-gray-200"}`}
+            className={`px-4 sm:px-6 py-4 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === "calls" ? "text-white border-b-2 border-[#4285F4]" : "text-gray-400 hover:text-gray-200"}`}
           >
             Calls
           </button>
           <button
             onClick={() => setActiveTab("orders")}
-            className={`px-6 py-4 text-sm font-medium transition-colors ${activeTab === "orders" ? "text-white border-b-2 border-[#4285F4]" : "text-gray-400 hover:text-gray-200"}`}
+            className={`px-4 sm:px-6 py-4 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === "orders" ? "text-white border-b-2 border-[#4285F4]" : "text-gray-400 hover:text-gray-200"}`}
           >
             Orders
           </button>
           <button
             onClick={() => setActiveTab("billing")}
-            className={`px-6 py-4 text-sm font-medium transition-colors ${activeTab === "billing" ? "text-white border-b-2 border-[#4285F4]" : "text-gray-400 hover:text-gray-200"}`}
+            className={`px-4 sm:px-6 py-4 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === "billing" ? "text-white border-b-2 border-[#4285F4]" : "text-gray-400 hover:text-gray-200"}`}
           >
             Billing History
           </button>
@@ -690,6 +703,7 @@ const ViewTenant = () => {
               TableRows={agentsData}
               headClass="[&>div]:justify-start border-none text-left whitespace-nowrap"
               tableClass="border-none table-fixed min-w-[800px]"
+              wrapperClass="overflow-x-auto w-full"
               emptyState={
                 <div className="text-center py-12 text-gray-500 flex flex-col items-center justify-center gap-3">
                   <Icon icon="lucide:bot" className="text-4xl text-gray-600" />
@@ -705,7 +719,7 @@ const ViewTenant = () => {
               TableRows={callsData}
               headClass="[&>div]:justify-start border-none text-left whitespace-nowrap"
               tableClass="border-none table-fixed min-w-[800px]"
-              wrapperClass="overflow-visible"
+              wrapperClass="overflow-x-auto w-full"
               emptyState={
                 <div className="text-center py-12 text-gray-500 flex flex-col items-center justify-center gap-3">
                   <Icon
@@ -724,6 +738,7 @@ const ViewTenant = () => {
               TableRows={ordersData}
               headClass="[&>div]:justify-start border-none text-left whitespace-nowrap"
               tableClass="border-none table-fixed min-w-[800px]"
+              wrapperClass="overflow-x-auto w-full"
               emptyState={
                 <div className="text-center py-12 text-gray-500 flex flex-col items-center justify-center gap-3">
                   <Icon
@@ -742,6 +757,7 @@ const ViewTenant = () => {
               TableRows={billingData}
               headClass="[&>div]:justify-start border-none text-left whitespace-nowrap"
               tableClass="border-none table-fixed min-w-[800px]"
+              wrapperClass="overflow-x-auto w-full"
               emptyState={
                 <div className="text-center py-12 text-gray-500 flex flex-col items-center justify-center gap-3">
                   <Icon
@@ -888,7 +904,7 @@ const ViewTenant = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-white">
           <div className="bg-[#111111] border border-[#1A1A1A] rounded-[20px] w-full max-w-[700px] overflow-hidden relative shadow-2xl">
             {/* Header */}
-            <div className="px-8 py-6 border-b border-[#1A1A1A] flex justify-between items-center">
+            <div className="px-4 sm:px-8 py-4 sm:py-6 border-b border-[#1A1A1A] flex justify-between items-center">
               <h2 className="text-[17px] text-gray-200">
                 Order Summary{" "}
                 <span className="text-gray-400">
@@ -905,7 +921,7 @@ const ViewTenant = () => {
 
             <>
               {/* Table Content */}
-              <div className="px-8 py-2 max-h-[400px] overflow-y-auto">
+              <div className="px-4 sm:px-8 py-2 max-h-[400px] overflow-y-auto overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-[#1A1A1A]">
@@ -914,9 +930,6 @@ const ViewTenant = () => {
                       </th>
                       <th className="py-4 text-[14px] font-semibold text-white text-center">
                         Order Quantity
-                      </th>
-                      <th className="py-4 text-[14px] font-semibold text-white">
-                        Time
                       </th>
                       <th className="py-4 text-[14px] font-semibold text-white text-right">
                         Price
@@ -938,9 +951,6 @@ const ViewTenant = () => {
                               {product.quantity}
                             </span>
                           </td>
-                          <td className="py-5 text-[14px] text-gray-300">
-                            {selectedOrder?.time || "-"}
-                          </td>
                           <td className="py-5 text-[14px] text-gray-300 text-right">
                             £{product.unit_prize || 0}
                           </td>
@@ -961,24 +971,24 @@ const ViewTenant = () => {
               </div>
 
               {/* Footer Actions */}
-              <div className="px-8 py-6 flex justify-between items-center mt-2 border-t border-[#1A1A1A]">
-                <div className="text-[15px] font-medium text-white">
+              <div className="px-4 sm:px-8 py-4 sm:py-6 flex flex-col sm:flex-row justify-between items-center gap-4 mt-2 border-t border-[#1A1A1A]">
+                <div className="text-[15px] font-medium text-white w-full sm:w-auto text-center sm:text-left">
                   Total:{" "}
                   <span className="text-[#2563EB]">
                     £{selectedOrder?.totalPrice || 0}
                   </span>
                 </div>
-                <div className="flex gap-4">
+                <div className="flex gap-3 sm:gap-4 w-full sm:w-auto justify-between sm:justify-start">
                   <button
                     onClick={handlePrintOrder}
-                    className="flex items-center gap-2 bg-[#1A2255] hover:bg-[#232D70] transition-colors text-white px-6 py-2.5 rounded-[10px] text-[13px] font-medium cursor-pointer"
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[#1A2255] hover:bg-[#232D70] transition-colors text-white px-4 sm:px-6 py-2.5 rounded-[10px] text-[13px] font-medium cursor-pointer"
                   >
                     <Printer className="w-4 h-4" />
                     Print
                   </button>
                   <button
                     onClick={handleDownloadOrder}
-                    className="flex items-center gap-2 bg-[#1A2255] hover:bg-[#232D70] transition-colors text-white px-6 py-2.5 rounded-[10px] text-[13px] font-medium cursor-pointer"
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[#1A2255] hover:bg-[#232D70] transition-colors text-white px-4 sm:px-6 py-2.5 rounded-[10px] text-[13px] font-medium cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
                     Download
