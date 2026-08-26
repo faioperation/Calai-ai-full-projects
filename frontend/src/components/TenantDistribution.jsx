@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import Dropdown from './Dropdown';
 
 const COLORS = {
   active: '#10B981',
@@ -47,16 +46,7 @@ const TenantDistribution = ({ apiData }) => {
     <div className="bg-[#191919] rounded-2xl p-6 border border-gray-800/50 flex flex-col h-full min-h-[400px]">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-white text-lg font-medium">Tenant Status Distribution</h3>
-        <div className="relative z-20">
-          <Dropdown 
-            options={["Weekly","Monthly", "Yearly", ]}
-            value={filter}
-            onSelect={(val) => setFilter(val)}
-            inputClass="!bg-transparent !border-[#2563EB] !rounded-full !py-1.5 !px-4 !text-sm !text-gray-300 text-center min-w-[120px] focus:outline-none"
-            optionClass="!bg-[#18181A] !border-[#2563EB] !text-gray-300"
-            icon="!text-gray-300 right-2"
-          />
-        </div>
+      
       </div>
       
       <div className="flex-1 w-full min-h-[350px] relative">
