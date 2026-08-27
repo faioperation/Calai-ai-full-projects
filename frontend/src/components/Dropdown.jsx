@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { FaCaretDown, FaCaretUp } from "react-icons/fa";
 
 const Dropdown = ({
@@ -24,6 +25,8 @@ const Dropdown = ({
   }, [value]);
   const [show, setShow] = useState(false);
   const dropdownRef = useRef(null);
+  const menuRef = useRef(null);
+  const [coords, setCoords] = useState(null);
 
   const handleSelect = (item) => {
     const val = typeof item === "object" && item !== null ? item.value : item;
@@ -45,7 +48,11 @@ const Dropdown = ({
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target) &&
+        (!menuRef.current || !menuRef.current.contains(event.target))
+      ) {
         setShow(false);
       }
     };
@@ -53,6 +60,29 @@ const Dropdown = ({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const updatePosition = () => {
+      if (show && dropdownRef.current) {
+        const rect = dropdownRef.current.getBoundingClientRect();
+        setCoords({
+          left: rect.left,
+          top: rect.bottom + 4,
+          width: rect.width,
+        });
+      }
+    };
+
+    updatePosition();
+    if (show) {
+      window.addEventListener("scroll", updatePosition, true);
+      window.addEventListener("resize", updatePosition);
+    }
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [show]);
 
   return (
     <div
@@ -84,27 +114,32 @@ const Dropdown = ({
         </div>
 
         {/* Dropdown Menu */}
-        <div
-          className={`absolute left-0 top-[105%] w-full bg-white  border border-[#D1D5DC] rounded-md shadow-md  text-[#000000] z-30 transition-all duration-300 text-center overflow-y-scroll hide-scrollbar  ${optionClass} ${
-            show
-              ? "opacity-100 visible max-h-60 "
-              : "opacity-0 invisible max-h-0 "
-          }`}
-        >
-          {options.map((item, index) => {
-            const isObj = typeof item === "object" && item !== null;
-            const label = isObj ? item.label : item;
-            return (
-              <div
-                key={index}
-                onClick={() => handleSelect(item)}
-                className={`py-2 cursor-pointer hover:bg-[#152483] hover:text-white `}
-              >
-                {label}
-              </div>
-            );
-          })} 
-        </div>
+        {typeof document !== "undefined" && createPortal(
+          <div
+            ref={menuRef}
+            style={coords ? { position: "fixed", top: coords.top, left: coords.left, width: coords.width } : { display: "none" }}
+            className={`bg-white border border-[#D1D5DC] rounded-md shadow-md text-[#000000] z-[9999] transition-all duration-300 text-center overflow-y-scroll hide-scrollbar ${optionClass} ${
+              show
+                ? "opacity-100 visible max-h-60"
+                : "opacity-0 invisible max-h-0"
+            }`}
+          >
+            {options.map((item, index) => {
+              const isObj = typeof item === "object" && item !== null;
+              const label = isObj ? item.label : item;
+              return (
+                <div
+                  key={index}
+                  onClick={() => handleSelect(item)}
+                  className={`py-2 cursor-pointer hover:bg-[#152483] hover:text-white `}
+                >
+                  {label}
+                </div>
+              );
+            })} 
+          </div>,
+          document.body
+        )}
       </div>
     </div>
   );
