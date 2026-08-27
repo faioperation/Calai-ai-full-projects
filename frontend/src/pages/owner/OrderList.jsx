@@ -78,9 +78,12 @@ const OrderList = () => {
       );
       toast.dismiss(toastId);
       
-      const printWindow = window.open("", "_blank");
-      if (printWindow) {
-        printWindow.document.write(`
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      document.body.appendChild(iframe);
+      
+      const printDocument = iframe.contentWindow.document;
+      printDocument.write(`
           <html>
             <head>
               <title>Print Receipt</title>
@@ -96,13 +99,16 @@ const OrderList = () => {
             </head>
             <body>${res.data}</body>
           </html>
-        `);
-        printWindow.document.close();
-        printWindow.focus();
+      `);
+      printDocument.close();
+      
+      iframe.contentWindow.focus();
+      setTimeout(() => {
+        iframe.contentWindow.print();
         setTimeout(() => {
-          printWindow.print();
-        }, 100);
-      }
+          document.body.removeChild(iframe);
+        }, 1000);
+      }, 100);
     } catch (err) {
       console.error(err);
       toast.error("Failed to prepare print. Please connect your printer.");
