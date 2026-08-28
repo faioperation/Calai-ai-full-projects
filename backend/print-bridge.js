@@ -108,10 +108,10 @@ console.log("   🖨️  CALAI THERMAL PRINT BRIDGE (ESC/POS)  🖨️   ");
 console.log("====================================================");
 console.log(`Backend URL:    ${config.BACKEND_URL}`);
 console.log(`Printer Type:   ${config.PRINTER_TYPE}`);
-if (config.PRINTER_TYPE === "NETWORK" || config.PRINTER_IP) {
-  console.log(`Network Target: ${config.PRINTER_IP}:${config.PRINTER_PORT}`);
-} else {
+if (config.PRINTER_TYPE === "USB") {
   console.log(`USB Target:     Windows Default Printer`);
+} else {
+  console.log(`Network Target: ${config.PRINTER_IP}:${config.PRINTER_PORT}`);
 }
 console.log(`Poll Interval:  ${config.POLL_INTERVAL_MS / 1000} seconds`);
 console.log("====================================================\n");
@@ -132,7 +132,18 @@ function sendToNetworkPrinter(ip, port, textContent) {
       console.log(
         `[${new Date().toLocaleTimeString()}] 📡 Sending ESC/POS print job data...`,
       );
-      client.write(textContent, "utf-8", () => {
+      
+      // Select Character Code Table: CP437 (Standard DOS)
+      // Command: ESC t 0 (0x1B 0x74 0x00)
+      const initCommand = Buffer.from([0x1b, 0x74, 0x00]);
+      
+      // Replace Pound (£) symbol with its CP437 byte value (0x9C)
+      const processedText = textContent.replace(/£/g, '\x9c');
+      const textBuffer = Buffer.from(processedText, "binary");
+      
+      const payload = Buffer.concat([initCommand, textBuffer]);
+
+      client.write(payload, () => {
         // Send ESC/POS cut paper command (\x1DV\x41\x03)
         const cutCommand = Buffer.from([0x1d, 0x56, 0x41, 0x03]);
         client.write(cutCommand, () => {
@@ -159,7 +170,8 @@ function sendToNetworkPrinter(ip, port, textContent) {
  */
 function sendToUsbPrinter(filePath) {
   return new Promise((resolve, reject) => {
-    const printCommand = `powershell -Command "Get-Content -Path '${filePath}' -Encoding utf8 | Out-Printer"`;
+    // If the printer driver expects raw data, Get-Content without encoding works best for binary written files
+    const printCommand = `powershell -Command "Get-Content -Path '${filePath}' | Out-Printer"`;
     exec(printCommand, (error, stdout, stderr) => {
       if (error) {
         return reject(error);
@@ -209,7 +221,26 @@ async function pollServer() {
           ? contentResponse.data
           : JSON.stringify(contentResponse.data);
 
-      if (config.PRINTER_TYPE === "NETWORK" || config.PRINTER_IP) {
+      if (config.PRINTER_TYPE === "USB") {
+        // Local Windows USB Printing
+        const tempPath = path.resolve("temp-receipt.txt");
+        // Replace £ with its CP437 byte value (0x9C) for standard raw thermal driver printing
+        const processedText = receiptText.replace(/£/g, '\x9c');
+        fs.writeFileSync(tempPath, processedText, "binary");
+        try {
+          await sendToUsbPrinter(tempPath);
+          console.log(
+            `[${new Date().toLocaleTimeString()}] ✅ Printed successfully to USB Default Printer`,
+          );
+        } catch (usbErr) {
+          console.error(
+            `[${new Date().toLocaleTimeString()}] ❌ USB Printing failed:`,
+            usbErr.message,
+          );
+        } finally {
+          if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        }
+      } else {
         // Direct Network Socket Printing
         try {
           await sendToNetworkPrinter(
@@ -227,23 +258,6 @@ async function pollServer() {
           );
           setTimeout(pollServer, config.POLL_INTERVAL_MS);
           return;
-        }
-      } else {
-        // Local Windows USB Printing
-        const tempPath = path.resolve("temp-receipt.txt");
-        fs.writeFileSync(tempPath, receiptText, "utf-8");
-        try {
-          await sendToUsbPrinter(tempPath);
-          console.log(
-            `[${new Date().toLocaleTimeString()}] ✅ Printed successfully to USB Default Printer`,
-          );
-        } catch (usbErr) {
-          console.error(
-            `[${new Date().toLocaleTimeString()}] ❌ USB Printing failed:`,
-            usbErr.message,
-          );
-        } finally {
-          if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
         }
       }
 
