@@ -114,50 +114,16 @@ const ViewTenant = () => {
 
   const handlePrintOrder = async () => {
     if (!selectedOrder) return;
+    const toastId = toast.loading("Sending to printer...");
     try {
-      const toastId = toast.loading("Preparing print...");
-      const res = await axiosSecure.get(
-        `/business-owner/order/download/${selectedOrder.id}`,
-        {
-          responseType: "text",
-        },
-      );
+      await axiosSecure.get(`/business-owner/order/download/${selectedOrder.id}`);
       toast.dismiss(toastId);
-      
-      const iframe = document.createElement("iframe");
-      iframe.style.display = "none";
-      document.body.appendChild(iframe);
-      
-      const printDocument = iframe.contentWindow.document;
-      printDocument.write(`
-          <html>
-            <head>
-              <title>Print Receipt</title>
-              <style>
-                body {
-                  font-family: monospace;
-                  white-space: pre;
-                  padding: 20px;
-                  margin: 0;
-                  font-size: 14px;
-                }
-              </style>
-            </head>
-            <body>${res.data}</body>
-          </html>
-      `);
-      printDocument.close();
-      
-      iframe.contentWindow.focus();
-      setTimeout(() => {
-        iframe.contentWindow.print();
-        setTimeout(() => {
-          document.body.removeChild(iframe);
-        }, 1000);
-      }, 100);
+      toast.success("Order sent to printer successfully!");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to prepare print. Please connect your printer.");
+      toast.dismiss(toastId);
+      const errorMessage = err.response?.data?.message || "Failed to print. Please check your printer connection.";
+      toast.error(errorMessage);
     }
   };
 
@@ -911,10 +877,10 @@ const ViewTenant = () => {
           <div className="bg-[#111111] border border-[#1A1A1A] rounded-[20px] w-full max-w-[700px] overflow-hidden relative shadow-2xl">
             {/* Header */}
             <div className="px-4 sm:px-8 py-4 sm:py-6 border-b border-[#1A1A1A] flex justify-between items-center">
-              <h2 className="text-[17px] text-gray-200">
-                Order Summary{" "}
-                <span className="text-gray-400">
-                  ({selectedOrder.customerName || "Customer"})
+              <h2 className="text-[17px] text-gray-200 flex items-center gap-2">
+                Order Summary
+                <span className="text-gray-400 font-normal">
+                  ({selectedOrder.customerName || "Customer"}) {selectedOrder.time ? `• ${selectedOrder.time}` : ""}
                 </span>
               </h2>
               <button
