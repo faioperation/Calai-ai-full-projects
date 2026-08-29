@@ -954,6 +954,7 @@ async def handle_summary(request: Request, background_tasks: BackgroundTasks):
     return {"status": "received"}
 
 
+@app.post("/")
 @app.post("/api/webhook/vapi")
 async def vapi_tool_fallback(request: Request, background_tasks: BackgroundTasks):
     """Central Webhook Router for Vapi (Receives Tools, Summaries, and Status Updates)"""

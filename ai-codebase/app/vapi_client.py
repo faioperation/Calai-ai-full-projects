@@ -58,6 +58,10 @@ def create_assistant(business_id: str, system_prompt: str, business_name: str = 
         "metadata": {
             "business_id": business_id
         },
+        "backgroundSound": "off",
+        "startSpeakingPlan": {
+            "waitSeconds": 0.1
+        },
         "model": {
             "provider": "openai",
             "model": LLM_MODEL,
